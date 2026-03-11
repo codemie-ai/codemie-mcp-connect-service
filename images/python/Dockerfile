@@ -1,0 +1,92 @@
+# Copyright 2026 EPAM Systems, Inc. ("EPAM")
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Lightweight Python runtime for executing custom Python scripts
+# Optimized for minimal image size
+FROM python:3.12-slim
+
+# Version pinning for reproducible builds
+#ARG GIT_VERSION=1:2.47.3-0+deb13u1
+#ARG CURL_VERSION=8.14.1-2
+#ARG GNUPG_VERSION=2.4.7-21
+#ARG NODE_VERSION=22.20.0-1nodesource1
+#ARG CLAUDE_CODE_VERSION=2.0.22
+#ARG NPM_VERSION=10.9.3
+#ARG PROCPS_VERSION=2:4.0.4-9
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PATH="/tmp/venv/bin:/usr/local/bin:${PATH}"
+
+# Install system dependencies, create user, and set up directories in a single optimized layer
+# This minimizes image size by:
+# 1. Combining all operations in one RUN command
+# 2. Using --no-install-recommends to avoid unnecessary packages
+# 3. Cleaning up all package manager caches and temporary files in the same layer
+# 4. Pinning versions for reproducible builds
+# hadolint ignore=DL3008,DL3016
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        git \
+        gnupg \
+        procps \
+    && apt-get install -y --no-install-recommends --only-upgrade openssl libssl3t64 openssl-provider-legacy && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/setup_node.sh && \
+    bash /tmp/setup_node.sh && \
+    apt-get install -y --no-install-recommends nodejs && \
+    npm install -g npm && \
+    npm install -g @anthropic-ai/claude-code && \
+    rm /tmp/setup_node.sh && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* \
+           /var/cache/apt/archives/* \
+           /root/.npm \
+           /tmp/* \
+           /var/tmp/* && \
+    groupadd --gid 1001 codemie && \
+    useradd --uid 1001 --gid 1001 --shell /bin/bash --create-home codemie && \
+    mkdir -p /tmp/venv && \
+    chown -R codemie:codemie /tmp/venv
+
+# Remediation for CVE-2026-27903, CVE-2026-27904 (minimatch), and CVE-2026-29786 (tar)
+ARG MINIMATCH_VERSION=10.2.3
+ARG TAR_VERSION=7.5.10
+RUN npm install -g minimatch@${MINIMATCH_VERSION} tar@${TAR_VERSION} \
+    && MINIMATCH_SRC="$(npm root -g)/minimatch" \
+    && MINIMATCH_DST="$(npm root -g)/npm/node_modules/minimatch" \
+    && TAR_SRC="$(npm root -g)/tar" \
+    && TAR_DST="$(npm root -g)/npm/node_modules/tar" \
+    && rm -rf "$MINIMATCH_DST" "$TAR_DST" \
+    && cp -r "$MINIMATCH_SRC" "$MINIMATCH_DST" \
+    && cp -r "$TAR_SRC" "$TAR_DST" \
+    && npm uninstall -g minimatch tar \
+    && npm cache clean --force
+
+# Set working directory
+WORKDIR /home/codemie
+
+# Switch to codemie user before installing dependencies
+USER codemie
+
+# Copy requirements file with proper ownership
+COPY --chown=codemie:codemie requirements.txt .
+
+# Create virtual environment and install dependencies in a single layer
+# Using --no-cache-dir to prevent caching and reduce image size
+RUN python -m venv /tmp/venv && \
+    /tmp/venv/bin/pip install --no-cache-dir -r requirements.txt && \
+    rm -rf ~/.cache/pip ~/.local/share/pip

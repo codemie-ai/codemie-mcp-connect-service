@@ -1,0 +1,490 @@
+### Variables
+@baseUrl = http://localhost:53128
+@accessToken = 12345
+@contentType = application/json
+
+### Health Check - No Auth Required
+GET {{baseUrl}}/health
+
+
+### Bridge Request - Default Caching (single_usage parameter omitted - defaults to false)
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "npx",
+  "method": "tools/list",
+  "args": [
+    "-y",
+    "@upstash/context7-mcp"
+  ],
+  "params": {},
+  "env": {},
+  "single_usage": true
+}
+
+###
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "uvx",
+  "method": "tools/list",
+  "args": [
+    "mcp-server-time"
+  ],
+  "params": {}
+}
+
+###
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "serverPath": "npx",
+    "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/tmp"],
+    "method": "tools/list",
+    "params": {}
+}
+
+###
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "serverPath": "npx",
+    "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/codemie"],
+    "method": "tools/call",
+    "params": {
+      "name": "list_directory",
+      "arguments": {
+        "path": "/home/codemie"
+      }
+    }
+}
+
+
+### Bridge Request - Streamable-http
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "http://127.0.0.1:3001/mcp",
+  "method": "tools/list",
+  "args": [],
+  "params": {},
+  "env": {},
+  "auth_token": null,
+  "http_transport_type": "streamable-http"
+}
+
+### Bridge Request - Connection Error (demonstrates enhanced error details)
+# This request will fail with ECONNREFUSED and return detailed error information
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "http://127.0.0.1:9999/mcp",
+  "method": "tools/list",
+  "args": [],
+  "params": {},
+  "http_transport_type": "streamable-http"
+}
+### Tool calls
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "http://127.0.0.1:3001/mcp",
+  "method": "tools/call",
+  "args": [],
+  "params": {"name": "echo", "arguments": {"message": "hello"}},
+  "env": {},
+  "auth_token": null,
+  "http_transport_type": "streamable-http"
+}
+
+### Bridge Request - SSE
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "http://127.0.0.1:3002/sse",
+  "method": "tools/list",
+  "args": [],
+  "params": {},
+  "env": {},
+  "auth_token": null,
+  "http_transport_type": "sse"
+}
+
+### Bridge Request - Single Usage (No Caching)
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "npx",
+  "method": "tools/list",
+  "args": [
+    "-y",
+    "@upstash/context7-mcp"
+  ],
+  "params": {},
+  "env": {},
+  "single_usage": true
+}
+
+### Bridge Request - Single Usage with HTTP Transport
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "http://127.0.0.1:3001/mcp",
+  "method": "tools/call",
+  "args": [],
+  "params": {"name": "echo", "arguments": {"message": "single-use client"}},
+  "env": {},
+  "http_transport_type": "streamable-http",
+  "single_usage": true
+}
+
+### Bridge Request - Cached Client (Default Behavior)
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "npx",
+  "method": "tools/list",
+  "args": [
+    "-y",
+    "@upstash/context7-mcp"
+  ],
+  "params": {},
+  "env": {},
+  "single_usage": false
+}
+
+### Bridge Request - Environment Variable Substitution in Args
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "python",
+  "method": "tools/list",
+  "args": [
+    "-m",
+    "server",
+    "--api-key=$API_KEY",
+    "--host=$HOST",
+    "--port=$PORT"
+  ],
+  "params": {},
+  "env": {
+    "API_KEY": "secret123",
+    "HOST": "localhost",
+    "PORT": "8080"
+  }
+}
+
+### Bridge Request - Environment Variable Substitution in Headers
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "http://127.0.0.1:3001/mcp",
+  "method": "tools/list",
+  "args": [],
+  "params": {},
+  "env": {
+    "AUTH_TOKEN": "bearer-token-12345",
+    "API_VERSION": "v1"
+  },
+  "mcp_headers": {
+    "Authorization": "Bearer $AUTH_TOKEN",
+    "X-API-Version": "$API_VERSION"
+  },
+  "http_transport_type": "streamable-http"
+}
+
+### Bridge Request - Multiple Variables in Single String
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "python",
+  "method": "tools/call",
+  "args": [
+    "-m",
+    "server",
+    "--url=$PROTOCOL://$HOST:$PORT/api"
+  ],
+  "params": {
+    "name": "fetch",
+    "arguments": {
+      "endpoint": "/data"
+    }
+  },
+  "env": {
+    "PROTOCOL": "https",
+    "HOST": "api.example.com",
+    "PORT": "443"
+  }
+}
+
+### Bridge Request - Environment Variables with Sensitive Data
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "npx",
+  "method": "tools/list",
+  "args": [
+    "-y",
+    "@upstash/context7-mcp",
+    "--redis-url=$REDIS_URL",
+    "--redis-token=$REDIS_TOKEN"
+  ],
+  "params": {},
+  "env": {
+    "REDIS_URL": "redis://localhost:6379",
+    "REDIS_TOKEN": "super-secret-token"
+  }
+}
+
+### Bridge Request - Env Substitution with Single Usage Mode
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "python",
+  "method": "tools/call",
+  "args": [
+    "-m",
+    "batch_processor",
+    "--api-key=$API_KEY",
+    "--batch-id=$BATCH_ID"
+  ],
+  "params": {
+    "name": "process_batch",
+    "arguments": {
+      "items": ["item1", "item2", "item3"]
+    }
+  },
+  "env": {
+    "API_KEY": "batch-api-key-xyz",
+    "BATCH_ID": "batch-20250101-001"
+  },
+  "single_usage": true
+}
+
+### Bridge Request - ServerPath URL Substitution (HTTP)
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "http://$HOST:$PORT/mcp",
+  "method": "tools/list",
+  "args": [],
+  "params": {},
+  "env": {
+    "HOST": "127.0.0.1",
+    "PORT": "3001"
+  },
+  "http_transport_type": "streamable-http"
+}
+
+### Bridge Request - ServerPath URL Substitution (HTTPS with Path)
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "https://$HOST:$PORT/api/$VERSION/mcp",
+  "method": "tools/list",
+  "args": [],
+  "params": {},
+  "env": {
+    "HOST": "api.example.com",
+    "PORT": "443",
+    "VERSION": "v2"
+  },
+  "http_transport_type": "sse"
+}
+
+### Bridge Request - ServerPath with Protocol Variable
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "$PROTOCOL://$HOST:$PORT/ws",
+  "method": "tools/list",
+  "args": [],
+  "params": {},
+  "env": {
+    "PROTOCOL": "ws",
+    "HOST": "127.0.0.1",
+    "PORT": "8080"
+  }
+}
+
+### Bridge Request - ServerPath and Headers Substitution Combined
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "http://$HOST:$PORT/mcp",
+  "method": "tools/call",
+  "args": [],
+  "params": {
+    "name": "echo",
+    "arguments": {
+      "message": "Testing serverPath and headers substitution"
+    }
+  },
+  "env": {
+    "HOST": "127.0.0.1",
+    "PORT": "3001",
+    "API_KEY": "secret-api-key-123",
+    "CLIENT_ID": "client-456"
+  },
+  "mcp_headers": {
+    "Authorization": "Bearer $API_KEY",
+    "X-Client-ID": "$CLIENT_ID"
+  },
+  "http_transport_type": "streamable-http"
+}
+
+### Bridge Request - Headers Logging with Sensitive Data (Streamable-HTTP)
+# This request demonstrates header logging with masking of sensitive values
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "http://127.0.0.1:3001/mcp",
+  "method": "tools/list",
+  "args": [],
+  "params": {},
+  "mcp_headers": {
+    "Authorization": "Bearer my-secret-token",
+    "X-API-Key": "super-secret-api-key",
+    "Content-Type": "application/json",
+    "User-Agent": "MCP-Bridge/1.0"
+  },
+  "http_transport_type": "streamable-http"
+}
+
+### Bridge Request - Headers Logging with SSE Transport
+# This request demonstrates header logging for SSE transport (note: headers may not be supported)
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "http://127.0.0.1:3002/sse",
+  "method": "tools/list",
+  "args": [],
+  "params": {},
+  "mcp_headers": {
+    "Authorization": "Bearer sse-token-12345",
+    "X-Custom-Header": "custom-value"
+  },
+  "http_transport_type": "sse"
+}
+
+###
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "npx",
+  "method": "tools/list",
+  "args": [
+    "-y",
+    "@modelcontextprotocol/server-puppeteer"
+  ],
+  "env": {
+    "DEBIAN_FRONTEND": "noninteractive",
+    "DOCKER_CONTAINER": true,
+    "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/chromium",
+    "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": true
+  },
+  "params": {},
+  "single_usage": false
+}
+
+###
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "uvx",
+  "method": "tools/list",
+  "args": [
+    "mcp-server-fetch",
+    "--ignore-robots-txt"
+  ],
+  "env": {},
+  "params": {},
+  "single_usage": false
+}
+
+###
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "node",
+  "method": "tools/list",
+  "args": [
+    "/codemie/additional-tools/fetch-mcp/dist/index.js",
+    "--ignore-robots-txt"
+  ],
+  "env": {},
+  "params": {},
+  "single_usage": false
+}
+
+###
+POST {{baseUrl}}/bridge
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "serverPath": "http://example.com:9586/mcp",
+  "method": "tools/list",
+  "args": [
+  ],
+  "env": {},
+  "params": {},
+  "http_transport_type": "streamable-http",
+  "single_usage": false
+}

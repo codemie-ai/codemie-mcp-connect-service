@@ -1,0 +1,91 @@
+[tool.poetry]
+name = "codemie-mcp-connect-service"
+version = "0.1.0"
+description = "MCP Connect Service - Python FastAPI implementation"
+authors = ["CodeMie Team"]
+readme = "README.md"
+package-mode = true
+packages = [
+  {include = "mcp_connect", from = "src"},
+  {include = "scripts"}
+]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.121.0"
+uvicorn = {version = "^0.38.0", extras = ["standard"]}
+pydantic = "^2.12.0"
+mcp = "^1.23.0"
+urllib3 = "^2.6.0"
+python-dotenv = "^1.2.1"
+python-json-logger = "^4.0.0"
+botocore = "^1.42.3"
+python-multipart = ">=0.0.22"
+cryptography = ">=46.0.5"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "<9"
+pytest-asyncio = "^1.2.0"
+httpx = "^0.28.1"
+pytest-cov = "^7.0.0"
+mypy = "^1.18.2"
+black = "^25.9.0"
+ruff = "^0.14.4"
+pre-commit = "^4.0.1"
+pip-licenses = "^5.5.0"
+
+[tool.poetry.scripts]
+format = "scripts.tooling:run_format"
+lint = "scripts.tooling:run_lint"
+typecheck = "scripts.tooling:run_typecheck"
+test = "scripts.tooling:run_test"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')"
+]
+addopts = "-m 'not integration'"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["mcp", "mcp.*", "botocore.*"]
+ignore_missing_imports = true
+
+[tool.black]
+line-length = 120
+target-version = ["py312"]
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pip-licenses]
+allow-only = """
+    MIT;\
+    MIT License;\
+    BSD-3-Clause;\
+    Apache-2.0;\
+    Mozilla Public License 2.0 (MPL 2.0);\
+    BSD License;\
+    PSF-2.0;\
+    Apache-2.0 OR BSD-3-Clause;\
+"""

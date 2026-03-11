@@ -1,0 +1,73 @@
+# Common dependencies for Python scripting
+# Pin exact versions for reproducibility and security
+
+# ====================
+# Core Dependencies
+# ====================
+
+# HTTP client library
+requests==2.32.5
+
+# Data processing and analysis
+pandas==2.2.3
+numpy==1.26.4
+
+# Plotting and visualization
+matplotlib==3.9.1
+
+# JSON and data serialization
+pydantic==2.12.3
+pydantic-settings==2.5.2
+
+# Environment variable management
+python-dotenv==1.0.1
+
+# Date and time utilities
+python-dateutil==2.9.0.post0
+
+# CLI argument parsing
+click==8.1.8
+
+# YAML support
+PyYAML==6.0.2
+
+# Logging enhancements
+structlog==24.4.0
+
+# ====================
+# File Processing Dependencies
+# ====================
+
+# PDF processing (core library only)
+pymupdf==1.24.14
+
+# PowerPoint processing
+python-pptx==1.0.2
+lxml==5.3.0
+
+# Word document processing
+python-docx==1.1.0
+docx2txt==0.8
+
+# Excel processing
+openpyxl==3.1.5
+
+# CSV processing with smart delimiter detection
+clevercsv==0.8.3
+
+# Archive processing
+py7zr==1.1.0
+
+# ====================
+# Shared Utilities
+# ====================
+
+# Markdown processing
+markdownify==1.2.0
+markdown==3.8
+
+# Document to markdown conversion (includes file format support)
+markitdown[all]==0.1.2
+
+# Character encoding detection
+chardet==5.2.0

@@ -1,0 +1,123 @@
+# Default values for codemie-mcp-connect-service.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# -- The number of MCP Connect pods to run
+replicaCount: 1
+
+## MCP Connect image
+image:
+  # -- Repository to use for the MCP Connect
+  repository: ""
+  # -- Image pull policy for the MCP Connect
+  pullPolicy: IfNotPresent
+  # -- Tag to use for the MCP Connect. Overrides the image tag whose default is the chart appVersion
+  tag: ""
+
+# -- Secrets with credentials to pull images from a private registry
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# -- List of extra environment variables to be used by the MCP Connect
+# @default -- `[]`
+env:
+  - name: LOG_FORMAT
+    value: "json"
+
+serviceAccount:
+  # -- Specifies whether a service account should be created
+  create: true
+  # -- Automatically mount a ServiceAccount's API credentials?
+  automount: false
+  # -- Annotations applied to created service account
+  annotations: {}
+  # -- Service account name for MCP Connect pod
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# -- Annotations to be added to MCP Connect pods
+podAnnotations: {}
+
+# -- Labels to be added to AI/Run MCP Connect pods.
+podLabels: {}
+
+# -- Toggle and define pod-level security context
+podSecurityContext: {}
+  # fsGroup: 2000
+
+# -- MCP Connect container-level security context
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  # -- MCP Connect service type
+  type: ClusterIP
+  # -- MCP Connect service port
+  port: 3000
+
+# -- Resource limits and requests for the MCP Connect pods
+resources:
+  requests:
+    memory: "1Gi"
+    cpu: "100m"
+  limits:
+    memory: "1Gi"
+    cpu: "500m"
+
+## Probes for the MCP Connect
+# Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+startupProbe:
+  httpGet:
+    path: /health
+    port: 3000
+  # -- Number of seconds after the container has started before probe is initiated
+  initialDelaySeconds: 20
+  # -- Minimum consecutive failures for the probe to be considered failed after having succeeded
+  failureThreshold: 60
+  # -- How often (in seconds) to perform the probe
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 3000
+  # -- Minimum consecutive failures for the probe to be considered failed after having succeeded
+  failureThreshold: 3
+  # -- Number of seconds after the container has started before probe is initiated
+  initialDelaySeconds: 20
+  # -- How often (in seconds) to perform the probe
+  periodSeconds: 30
+  # -- Minimum consecutive successes for the probe to be considered successful after having failed
+  successThreshold: 1
+  # -- Number of seconds after which the probe times out
+  timeoutSeconds: 1
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 3000
+  # -- Minimum consecutive failures for the probe to be considered failed after having succeeded
+  failureThreshold: 3
+  # -- Number of seconds after the container has started before probe is initiated
+  initialDelaySeconds: 20
+  # -- How often (in seconds) to perform the probe
+  periodSeconds: 30
+  # -- Minimum consecutive successes for the probe to be considered successful after having failed
+  successThreshold: 1
+  # -- Number of seconds after which the probe times out
+  timeoutSeconds: 1
+
+# -- Node selector to be added to the MCP Connect pods
+nodeSelector: {}
+
+# -- Node selector to be added to the MCP Connect pods
+tolerations: []
+
+# -- Assign affinity rules to the statefulset
+affinity: {}
