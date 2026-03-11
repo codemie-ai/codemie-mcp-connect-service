@@ -139,9 +139,9 @@ RUN npm install -g minimatch@${MINIMATCH_VERSION} \
     && npm uninstall -g minimatch \
     && npm cache clean --force
 
-# TODO: Remove this layer once npm ships with tar >= 7.5.10 (npm@11.11.0 still bundles tar@7.5.9)
-# Remediation for GHSA-qffp-2rhf-9h96 (tar@7.5.9 bundled in npm)
-ARG TAR_VERSION=7.5.10
+# TODO: Remove this layer once npm ships with tar >= 7.5.11 (npm@11.11.0 still bundles tar@7.5.9)
+# Remediation for CVE-2026-31802 (tar@7.5.9 bundled in npm)
+ARG TAR_VERSION=7.5.11
 RUN npm install -g tar@${TAR_VERSION} \
     && TAR_SRC="$(npm root -g)/tar" \
     && TAR_DST="$(npm root -g)/npm/node_modules/tar" \
