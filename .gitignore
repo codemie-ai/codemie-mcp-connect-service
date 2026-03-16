@@ -87,5 +87,4 @@ literal:old_text=new_text
 !.claude/agents/codemie-dev-agent.md
 bmad/*
 .gemini/*
-.github/*
 local/*

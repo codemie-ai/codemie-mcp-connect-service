@@ -1,5 +1,9 @@
 # CodeMie MCP Connect Service
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/website-codemie.ai-informational)](https://codemie.ai)
+[![Docs](https://img.shields.io/badge/docs-docs.codemie.ai-informational)](https://docs.codemie.ai)
+
      ██████╗ ██████╗ ██████╗ ███████╗███╗   ███╗██╗███████╗
     ██╔════╝██╔═══██╗██╔══██╗██╔════╝████╗ ████║██║██╔════╝
     ██║     ██║   ██║██║  ██║█████╗  ██╔████╔██║██║█████╗
@@ -13,6 +17,22 @@
     ██║╚██╔╝██║██║     ██╔═══╝     ██║     ██║   ██║██║╚██╗██║██║╚██╗██║██╔══╝  ██║        ██║
     ██║ ╚═╝ ██║╚██████╗██║         ╚██████╗╚██████╔╝██║ ╚████║██║ ╚████║███████╗╚██████╗   ██║
     ╚═╝     ╚═╝ ╚═════╝╚═╝          ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝ ╚═════╝   ╚═╝
+
+**Platform for AI-Native Delivery, Modernization, and Business.**
+
+CodeMie is an open platform that lets teams build, orchestrate, and scale AI agents across the entire software lifecycle — from planning and coding to testing, deployment, and operations. It unites intelligent assistants, multi-agent workflows, deep integrations, and project knowledge in one system.
+
+**What you can do with CodeMie:**
+
+- 🚀 **AI-Native SDLC & Delivery** — Automate every phase of the software lifecycle: discovery, architecture, development, testing, and deployment with purpose-built AI agents.
+- 🔄 **AI Migration & Modernization** — Migrate and modernize legacy systems and mainframes using AI-powered analysis, code exploration (AICE), and automated transformation workflows.
+- 💼 **AI for Business & Operations** — Deploy AI agents across non-engineering functions such as finance, HR, sales, and support.
+
+**This repository — `codemie-mcp-connect-service` — is the MCP bridge component of the CodeMie platform.** It provides HTTP/HTTPS-to-stdio protocol translation, enabling cloud-based CodeMie AI agents to communicate with locally running MCP servers over any transport (stdio, streamable-http, SSE). Deployed as a Docker container with optional ngrok tunneling for secure public access.
+
+🌐 **Website:** [codemie.ai](https://codemie.ai)
+📖 **Documentation:** [docs.codemie.ai](https://docs.codemie.ai)
+🖥️ **CLI tool:** [codemie-code](https://github.com/codemie-ai/codemie-code)
 
 A comprehensive containerized solution that bridges cloud-based AI services with local Model Context Protocol (MCP) servers.
 
@@ -548,6 +568,10 @@ The Docker container supports volume mounting for persistent storage and file sy
 - **SQLite databases**: Mount for persistent database storage
 - **Custom configurations**: Mount configuration files as needed
 - **Project files**: Mount your project directories for development
+
+## Contributing
+
+We welcome contributions! Please read our [Contributing Guide](CONTRIBUTING.md) for commit conventions, branch workflow, dev setup, and code standards. All participants are expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License Compliance
 
