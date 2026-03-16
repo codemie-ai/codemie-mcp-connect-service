@@ -128,30 +128,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
 # Update npm to latest stable version
 RUN npm install -g npm@latest
 
-# TODO: Remove this layer once npm ships with minimatch >= 10.2.4 (npm@11.11.0 still bundles minimatch@10.2.2)
-# Remediation for CVE-2026-27903 and CVE-2026-27904 (minimatch@10.2.2 bundled in npm)
-ARG MINIMATCH_VERSION=10.2.4
-RUN npm install -g minimatch@${MINIMATCH_VERSION} \
-    && MINIMATCH_SRC="$(npm root -g)/minimatch" \
-    && MINIMATCH_DST="$(npm root -g)/npm/node_modules/minimatch" \
-    && rm -rf "$MINIMATCH_DST" \
-    && cp -r "$MINIMATCH_SRC" "$MINIMATCH_DST" \
-    && npm uninstall -g minimatch \
-    && npm cache clean --force
-
-# TODO: Remove this layer once npm ships with tar >= 7.5.11 (npm@11.11.0 still bundles tar@7.5.9)
-# Remediation for CVE-2026-31802 (tar@7.5.9 bundled in npm)
-ARG TAR_VERSION=7.5.11
-RUN npm install -g tar@${TAR_VERSION} \
-    && TAR_SRC="$(npm root -g)/tar" \
-    && TAR_DST="$(npm root -g)/npm/node_modules/tar" \
-    && rm -rf "$TAR_DST" \
-    && cp -r "$TAR_SRC" "$TAR_DST" \
-    && npm uninstall -g tar \
-    && npm cache clean --force
-
 # Install Maven
-ENV MAVEN_VERSION=3.9.13
+ENV MAVEN_VERSION=3.9.14
 ENV MAVEN_HOME=/opt/apache-maven-${MAVEN_VERSION}
 
 RUN curl -Lso "/tmp/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
