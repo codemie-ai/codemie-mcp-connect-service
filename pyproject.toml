@@ -22,6 +22,7 @@ python-json-logger = "^4.0.0"
 botocore = "^1.42.3"
 python-multipart = ">=0.0.22"
 cryptography = ">=46.0.5"
+pyjwt = {version = ">=2.12.0", extras = ["crypto"]}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "<9"

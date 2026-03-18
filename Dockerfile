@@ -41,7 +41,7 @@
 # ==============================================================================
 # Stage 1: Build GitHub MCP Server (Go)
 # ==============================================================================
-FROM golang:1.25.7-alpine AS github-mcp-build
+FROM dhi.io/golang:1.25-alpine3.23-dev AS github-mcp-build
 ARG VERSION="dev"
 ARG TARGETARCH
 
@@ -181,9 +181,9 @@ RUN git clone --depth 1 --recursive https://github.com/modelcontextprotocol/serv
 WORKDIR /codemie/servers
 RUN rm -rf src/everything
 
-RUN npm pkg set 'overrides.esbuild'='>=0.24.0' && \
+RUN npm pkg set 'overrides.esbuild'='>=0.27.4' && \
     npm pkg set 'overrides.@isaacs/brace-expansion'='>=5.0.1' && \
-    npm pkg set 'overrides.tar'='>=7.5.7' && \
+    npm pkg set 'overrides.tar'='>=7.5.11' && \
     rm -f package-lock.json
 RUN --mount=type=cache,target=/root/.npm \
     npm install && npm run build && npm run link-all
@@ -208,9 +208,9 @@ RUN --mount=type=cache,target=/root/.npm \
 RUN mkdir -p /codemie/additional-tools && \
     git clone --depth 1 https://github.com/zcaceres/fetch-mcp.git /codemie/additional-tools/fetch-mcp
 WORKDIR /codemie/additional-tools/fetch-mcp
-RUN npm pkg set 'overrides.esbuild'='>=0.24.0' && \
+RUN npm pkg set 'overrides.esbuild'='>=0.27.4' && \
     npm pkg set 'overrides.@isaacs/brace-expansion'='>=5.0.1' && \
-    npm pkg set 'overrides.tar'='>=7.5.7' && \
+    npm pkg set 'overrides.tar'='>=7.5.11' && \
     rm -f package-lock.json
 RUN --mount=type=cache,target=/root/.npm \
     npm install
