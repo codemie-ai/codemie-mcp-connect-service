@@ -69,7 +69,8 @@ source .venv/bin/activate && \
   poetry run ruff check && \
   poetry run mypy src/ && \
   poetry run black --check src/ tests/ && \
-  poetry run pytest tests/ --cov=src --cov-report=term-missing
+  poetry run pytest tests/ --cov=src --cov-report=term-missing && \
+  make gitleaks
 ```
 
 All checks must pass (exit code 0).

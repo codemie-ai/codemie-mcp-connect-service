@@ -33,6 +33,7 @@ poetry run pytest --cov=src                  # With coverage
 poetry run mypy src/                         # Type check
 poetry run black src/ tests/                 # Format
 poetry run ruff check src/ tests/            # Lint
+make gitleaks                                # Security scan
 ```
 
 ### Pre-Commit Quality Check (REQUIRED before commit/PR)
@@ -43,7 +44,8 @@ poetry run ruff check && \
 poetry run mypy src/ && \
 poetry run black --check src/ tests/ && \
 poetry run pytest tests/ --cov=src --cov-report=term-missing && \
-poetry run pytest tests/ -m integration --cov=src --cov-report=term-missing
+poetry run pytest tests/ -m integration --cov=src --cov-report=term-missing && \
+make gitleaks
 ```
 
 All checks MUST pass (exit code 0).

@@ -202,6 +202,11 @@ poetry run mypy src/                 # Type check
 poetry run black src/ tests/         # Black formatting
 ```
 
+**Security Scanning:**
+```bash
+make gitleaks                        # Scan for secrets and credentials
+```
+
 **Pre-commit Quality Check (REQUIRED before commit/PR):**
 ```bash
 source .venv/bin/activate && \
@@ -210,7 +215,8 @@ poetry run ruff check && \
 poetry run mypy src/ && \
 poetry run black --check src/ tests/ && \
 poetry run pytest tests/ --cov=src --cov-report=term-missing && \
-poetry run pytest tests/ -m integration --cov=src --cov-report=term-missing
+poetry run pytest tests/ -m integration --cov=src --cov-report=term-missing && \
+make gitleaks
 ```
 
 All checks MUST pass (exit code 0).

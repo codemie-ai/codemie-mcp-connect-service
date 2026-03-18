@@ -369,7 +369,7 @@ Content-Type: {{contentType}}
   "env": {
     "HOST": "127.0.0.1",
     "PORT": "3001",
-    "API_KEY": "secret-api-key-123",
+    "API_KEY": "api-key-123",
     "CLIENT_ID": "client-456"
   },
   "mcp_headers": {
