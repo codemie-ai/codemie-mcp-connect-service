@@ -62,20 +62,6 @@ RUN apt-get update && \
     mkdir -p /tmp/venv && \
     chown -R codemie:codemie /tmp/venv
 
-# Remediation for CVE-2026-27903, CVE-2026-27904 (minimatch), and CVE-2026-29786 (tar)
-ARG MINIMATCH_VERSION=10.2.3
-ARG TAR_VERSION=7.5.10
-RUN npm install -g minimatch@${MINIMATCH_VERSION} tar@${TAR_VERSION} \
-    && MINIMATCH_SRC="$(npm root -g)/minimatch" \
-    && MINIMATCH_DST="$(npm root -g)/npm/node_modules/minimatch" \
-    && TAR_SRC="$(npm root -g)/tar" \
-    && TAR_DST="$(npm root -g)/npm/node_modules/tar" \
-    && rm -rf "$MINIMATCH_DST" "$TAR_DST" \
-    && cp -r "$MINIMATCH_SRC" "$MINIMATCH_DST" \
-    && cp -r "$TAR_SRC" "$TAR_DST" \
-    && npm uninstall -g minimatch tar \
-    && npm cache clean --force
-
 # Set working directory
 WORKDIR /home/codemie
 

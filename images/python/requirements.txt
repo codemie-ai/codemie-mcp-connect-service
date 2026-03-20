@@ -64,7 +64,7 @@ py7zr==1.1.0
 
 # Markdown processing
 markdownify==1.2.0
-markdown==3.8
+markdown==3.8.1
 
 # Document to markdown conversion (includes file format support)
 markitdown[all]==0.1.2
