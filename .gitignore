@@ -88,3 +88,5 @@ literal:old_text=new_text
 bmad/*
 .gemini/*
 local/*
+.codemie/
+ai-run-mcp-servers/
