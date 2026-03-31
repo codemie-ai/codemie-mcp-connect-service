@@ -48,6 +48,12 @@ RUN apt-get update && \
     curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/setup_node.sh && \
     bash /tmp/setup_node.sh && \
     apt-get install -y --no-install-recommends nodejs && \
+    # TODO: workaround for npm self-upgrade bug: NodeSource Node 22 ships with npm@10.9.7
+    # whose @npmcli/arborist lacks eager require of 'promise-retry', causing MODULE_NOT_FOUND
+    # when upgrading directly to npm@11.12.0. Intermediate step to 10.9.8 (which has a working
+    # arborist for self-upgrade) resolves this. Fixed upstream in arborist@8.0.5 (npm@11.12.1+).
+    # Remove the @10.9.8 line once npm ships with arborist>=8.0.5 bundled.
+    npm install -g npm@10.9.8 && \
     npm install -g npm && \
     npm install -g @anthropic-ai/claude-code && \
     rm /tmp/setup_node.sh && \
