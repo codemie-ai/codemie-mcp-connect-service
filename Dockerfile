@@ -54,11 +54,11 @@ RUN --mount=type=cache,target=/var/cache/apk \
 # Clone and build GitHub MCP Server from specific tag
 RUN git clone --branch latest-release --depth 1 https://github.com/github/github-mcp-server.git .
 
-# TODO: Remove once github-mcp-server ships with modelcontextprotocol/go-sdk >= v1.4.0
-# Remediation for CVE-2026-27896 (go-sdk@v1.3.1-0.20260220105450-b17143f71798 bundled in github-mcp-server, fixed in v1.4.0)
-# Note: v1.3.1 release fixes CVE but drops Extensions field used by github-mcp-server; v1.4.0 has both the fix and Extensions
+# TODO: Remove once github-mcp-server ships with modelcontextprotocol/go-sdk >= v1.4.1
+# Remediation for CVE-2026-27896 and CVE-2026-33252 (go-sdk vulnerable versions bundled in github-mcp-server, fixed in v1.4.1)
+# Note: v1.4.1 fixes CSRF/Origin-header validation (CVE-2026-33252) in Streamable HTTP transport
 RUN --mount=type=cache,target=/go/pkg/mod \
-    go get github.com/modelcontextprotocol/go-sdk@v1.4.0 && \
+    go get github.com/modelcontextprotocol/go-sdk@v1.4.1 && \
     go mod tidy
 
 # Build with architecture support and optimizations

@@ -83,8 +83,6 @@ ENV/
 literal:old_text=new_text
 .codemie!/.env
 
-.claude
-!.claude/agents/codemie-dev-agent.md
 bmad/*
 .gemini/*
 local/*
