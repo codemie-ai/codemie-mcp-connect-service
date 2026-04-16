@@ -24,6 +24,7 @@ FROM python:3.12-slim
 #ARG CLAUDE_CODE_VERSION=2.0.22
 #ARG NPM_VERSION=10.9.3
 #ARG PROCPS_VERSION=2:4.0.4-9
+ARG PICOMATCH_VERSION=4.0.4
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -67,6 +68,20 @@ RUN apt-get update && \
     useradd --uid 1001 --gid 1001 --shell /bin/bash --create-home codemie && \
     mkdir -p /tmp/venv && \
     chown -R codemie:codemie /tmp/venv
+
+# TODO: Remove once npm ships with tinyglobby that includes picomatch >= 4.0.4
+# Remediation for CVE-2026-33671 (picomatch@4.0.3 nested in npm via tinyglobby)
+# hadolint ignore=DL4006
+RUN npm install -g picomatch@${PICOMATCH_VERSION} \
+    && PICOMATCH_SRC="$(npm root -g)/picomatch" \
+    && find "$(npm root -g)" -mindepth 2 -name "picomatch" -type d | while read -r dir; do \
+           grep -q '"version": "4.0.3"' "$dir/package.json" 2>/dev/null \
+           && rm -rf "$dir" \
+           && cp -r "$PICOMATCH_SRC" "$dir" \
+           || true; \
+       done \
+    && npm uninstall -g picomatch \
+    && npm cache clean --force
 
 # Set working directory
 WORKDIR /home/codemie
