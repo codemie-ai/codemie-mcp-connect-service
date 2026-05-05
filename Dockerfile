@@ -143,7 +143,7 @@ RUN npm install -g picomatch@${PICOMATCH_VERSION} \
     && npm cache clean --force
 
 # Install Maven
-ENV MAVEN_VERSION=3.9.14
+ENV MAVEN_VERSION=3.9.15
 ENV MAVEN_HOME=/opt/apache-maven-${MAVEN_VERSION}
 
 RUN curl -Lso "/tmp/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
