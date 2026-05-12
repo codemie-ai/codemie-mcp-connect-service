@@ -16,7 +16,7 @@ fastapi = "^0.121.0"
 uvicorn = {version = "^0.38.0", extras = ["standard"]}
 pydantic = "^2.12.0"
 mcp = "^1.23.0"
-urllib3 = "^2.6.0"
+urllib3 = "^2.7.0"
 python-dotenv = "^1.2.1"
 python-json-logger = "^4.0.0"
 botocore = "^1.42.3"
