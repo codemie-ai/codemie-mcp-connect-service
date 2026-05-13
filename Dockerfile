@@ -128,20 +128,6 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
 # Update npm to latest stable version
 RUN npm install -g npm@latest
 
-# TODO: Remove once npm ships with tinyglobby that includes picomatch >= 4.0.4
-# Remediation for CVE-2026-33671 (picomatch@4.0.3 nested in npm via tinyglobby)
-ARG PICOMATCH_VERSION=4.0.4
-RUN npm install -g picomatch@${PICOMATCH_VERSION} \
-    && PICOMATCH_SRC="$(npm root -g)/picomatch" \
-    && find "$(npm root -g)" -mindepth 2 -name "picomatch" -type d | while read -r dir; do \
-           grep -q '"version": "4.0.3"' "$dir/package.json" 2>/dev/null \
-           && rm -rf "$dir" \
-           && cp -r "$PICOMATCH_SRC" "$dir" \
-           || true; \
-       done \
-    && npm uninstall -g picomatch \
-    && npm cache clean --force
-
 # Install Maven
 ENV MAVEN_VERSION=3.9.15
 ENV MAVEN_HOME=/opt/apache-maven-${MAVEN_VERSION}
