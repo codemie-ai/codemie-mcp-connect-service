@@ -24,6 +24,8 @@ FROM python:3.12-slim
 #ARG CLAUDE_CODE_VERSION=2.0.22
 #ARG NPM_VERSION=10.9.3
 #ARG PROCPS_VERSION=2:4.0.4-9
+ARG SIMPLE_DECK_VERSION=4.2.12.77+3ad7d6e
+ARG INSTALL_SIMPLE_DECK=false
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -37,12 +39,16 @@ ENV PYTHONUNBUFFERED=1 \
 # 2. Using --no-install-recommends to avoid unnecessary packages
 # 3. Cleaning up all package manager caches and temporary files in the same layer
 # 4. Pinning versions for reproducible builds
+#
+# libcairo2 is required by cairosvg for SVG rendering (simple-deck dependency)
+#
 # hadolint ignore=DL3008,DL3016
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
         git \
         gnupg \
+        libcairo2 \
         procps \
     && apt-get install -y --no-install-recommends --only-upgrade openssl libssl3t64 openssl-provider-legacy && \
     curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/setup_node.sh && \
@@ -82,3 +88,14 @@ COPY --chown=codemie:codemie requirements.txt .
 RUN python -m venv /tmp/venv && \
     /tmp/venv/bin/pip install --no-cache-dir -r requirements.txt && \
     rm -rf ~/.cache/pip ~/.local/share/pip
+
+# Install simple-deck from GCP Artifact Registry when INSTALL_SIMPLE_DECK=true
+RUN --mount=type=secret,id=google_credentials,dst=/kaniko/google_credentials.json,uid=1001 \
+    if [ "$INSTALL_SIMPLE_DECK" = "true" ]; then \
+        export GOOGLE_APPLICATION_CREDENTIALS=/kaniko/google_credentials.json; \
+        /tmp/venv/bin/pip install --no-cache-dir keyrings.google-artifactregistry-auth && \
+        /tmp/venv/bin/pip install --no-cache-dir "simple-deck==${SIMPLE_DECK_VERSION}" \
+            --extra-index-url https://europe-west3-python.pkg.dev/or2-msq-epmd-edp-anthos-t1iylu/simple-deck-python/simple/ && \
+        /tmp/venv/bin/pip uninstall -y keyrings.google-artifactregistry-auth && \
+        rm -rf ~/.cache/pip ~/.local/share/pip; \
+    fi
