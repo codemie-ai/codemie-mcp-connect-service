@@ -74,37 +74,7 @@ CodeMie MCP Connect Service solves a critical challenge in the MCP ecosystem: en
 
 ## Quick Start
 
-### Prerequisites
-
-The Docker build requires the `ai-run-mcp-servers` repository which contains EPAM MCP servers (postgres, puppeteer):
-
-```bash
-# Clone via SSH (recommended)
-git clone git@gitbud.epam.com:epm-cdme/ai-run-mcp-servers.git ai-run-mcp-servers
-
-# Or clone via HTTPS
-git clone https://gitbud.epam.com/epm-cdme/ai-run-mcp-servers.git ai-run-mcp-servers
-```
-
 ### Building the Docker Image
-
-**Option 1: Using the build script (recommended)**
-
-```bash
-# Build with default tag (mcp-connect:latest)
-./build.sh
-
-# Build with custom tag
-./build.sh codemie-mcp-connect-service:v1.0
-
-# Build without Docker cache
-./build.sh --no-cache
-
-# Custom tag + no cache
-./build.sh codemie-mcp-connect-service:v1.0 --no-cache
-```
-
-**Option 2: Manual build**
 
 ```bash
 docker build --platform linux/amd64 -t codemie-mcp-connect-service .

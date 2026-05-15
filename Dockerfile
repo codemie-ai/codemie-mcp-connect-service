@@ -191,16 +191,16 @@ RUN --mount=type=cache,target=/root/.npm \
 
 # Install EPAM MCP servers (postgres, puppeteer)
 WORKDIR /codemie
-COPY ai-run-mcp-servers ./ai-run-mcp-servers
+COPY mcp-servers ./mcp-servers
 
 # Build postgres-typescript
-WORKDIR /codemie/ai-run-mcp-servers/epm-cdme/postgres-typescript
+WORKDIR /codemie/mcp-servers/postgres-typescript
 RUN rm -f package-lock.json
 RUN --mount=type=cache,target=/root/.npm \
     npm install && npm run build && npm link
 
 # Build puppeteer-typescript
-WORKDIR /codemie/ai-run-mcp-servers/epm-cdme/puppeteer-typescript
+WORKDIR /codemie/mcp-servers/puppeteer-typescript
 RUN rm -f package-lock.json
 RUN --mount=type=cache,target=/root/.npm \
     npm install && npm run build && npm link
