@@ -129,7 +129,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
 RUN npm install -g npm@latest
 
 # Install Maven
-ENV MAVEN_VERSION=3.9.15
+ENV MAVEN_VERSION=3.9.16
 ENV MAVEN_HOME=/opt/apache-maven-${MAVEN_VERSION}
 
 RUN curl -Lso "/tmp/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
