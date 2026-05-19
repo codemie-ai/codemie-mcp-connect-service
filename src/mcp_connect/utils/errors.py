@@ -39,6 +39,7 @@ import traceback
 from collections.abc import Callable
 from typing import Any
 
+import httpx
 from pydantic import ValidationError
 
 
@@ -177,6 +178,30 @@ def get_stacktrace_string() -> str:
     if trace.startswith("NoneType:"):
         return "No traceback available"
     return trace
+
+
+def extract_http_status_error(exception: BaseException) -> httpx.HTTPStatusError | None:
+    """Extract httpx.HTTPStatusError from an exception, including from nested ExceptionGroups.
+
+    Traverses BaseExceptionGroup instances to find an httpx.HTTPStatusError, which
+    carries the HTTP status code and response from a downstream service.
+
+    Args:
+        exception: Exception to search
+
+    Returns:
+        The httpx.HTTPStatusError if found, None otherwise
+    """
+    if isinstance(exception, httpx.HTTPStatusError):
+        return exception
+
+    if isinstance(exception, BaseExceptionGroup):
+        for sub in exception.exceptions:
+            result = extract_http_status_error(sub)
+            if result is not None:
+                return result
+
+    return None
 
 
 def extract_root_cause_message(exception: Exception) -> str:

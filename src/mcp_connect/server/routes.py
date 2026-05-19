@@ -28,7 +28,12 @@ from ..client.manager import get_or_create_client, invoke_with_timeout
 from ..client.single_usage import execute_single_usage_request
 from ..models import BridgeRequestBody
 from ..utils.context import get_request_context, get_request_id
-from ..utils.errors import extract_error_details, extract_root_cause_message, get_stacktrace_string
+from ..utils.errors import (
+    extract_error_details,
+    extract_http_status_error,
+    extract_root_cause_message,
+    get_stacktrace_string,
+)
 from ..utils.logger import get_log_level, get_logger
 from ..utils.masking import mask_dict_values
 from .middleware import setup_request_context, verify_token
@@ -138,8 +143,12 @@ async def _handle_single_usage_request(request: BridgeRequestBody, timeout_ms: i
         error_response = format_error_response(exc, "Request validation failed")
         raise HTTPException(status_code=422, detail=error_response) from exc
     except Exception as exc:
-        # Generic exception handler - don't include str(exc) for ExceptionGroups
-        # as format_error_response will extract the root cause
+        http_error = extract_http_status_error(exc)
+        if http_error is not None:
+            raise HTTPException(
+                status_code=http_error.response.status_code,
+                detail={"error": str(http_error), "url": str(http_error.request.url)},
+            ) from exc
         base_msg = "MCP method execution failed"
         if not isinstance(exc, BaseExceptionGroup):
             base_msg = f"{base_msg}: {str(exc)}"
@@ -174,7 +183,12 @@ async def _handle_cached_client_request(request: BridgeRequestBody, timeout_ms: 
         )
         raise
     except Exception as exc:
-        # Don't include str(exc) for ExceptionGroups as format_error_response will extract root cause
+        http_error = extract_http_status_error(exc)
+        if http_error is not None:
+            raise HTTPException(
+                status_code=http_error.response.status_code,
+                detail={"error": str(http_error), "url": str(http_error.request.url)},
+            ) from exc
         base_msg = "Failed to create MCP client"
         if not isinstance(exc, BaseExceptionGroup):
             base_msg = f"{base_msg}: {str(exc)}"
@@ -203,7 +217,12 @@ async def _handle_cached_client_request(request: BridgeRequestBody, timeout_ms: 
         error_response = format_error_response(exc, f"Request timeout: {timeout_ms}ms")
         raise HTTPException(status_code=504, detail=error_response) from exc
     except Exception as exc:
-        # Don't include str(exc) for ExceptionGroups as format_error_response will extract root cause
+        http_error = extract_http_status_error(exc)
+        if http_error is not None:
+            raise HTTPException(
+                status_code=http_error.response.status_code,
+                detail={"error": str(http_error), "url": str(http_error.request.url)},
+            ) from exc
         base_msg = "MCP method execution failed"
         if not isinstance(exc, BaseExceptionGroup):
             base_msg = f"{base_msg}: {str(exc)}"

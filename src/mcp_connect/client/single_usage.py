@@ -29,18 +29,16 @@ from fastapi import HTTPException
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
-from mcp.types import Implementation
 
 from ..models.request import BridgeRequestBody
 from ..utils import apply_substitutions, mask_dict_values, mask_sensitive_headers
 from ..utils.logger import get_logger
+from .client_info import get_client_info
 
 # Reuse the shared transport context manager to avoid duplication
 from .transports import get_transport_ctx
 
 logger = get_logger(__name__)
-
-CLIENT_INFO = Implementation(name="mcp-bridge", version="1.0.0")
 
 # Timeout constants - configurable via environment variables
 # Read from env vars with defaults (in milliseconds), convert to seconds for SDK usage
@@ -143,7 +141,7 @@ async def _execute_stdio_request(
     try:
         # Simple SDK pattern - context managers handle all cleanup
         async with stdio_client(server_params) as (read, write):
-            async with ClientSession(read, write, client_info=CLIENT_INFO) as session:
+            async with ClientSession(read, write, client_info=get_client_info()) as session:
                 # Initialize with timeout
                 await asyncio.wait_for(session.initialize(), timeout=INIT_TIMEOUT_SECONDS)
 
@@ -168,8 +166,20 @@ async def _execute_stdio_request(
             },
         ) from exc
     except Exception as exc:
-        from ..utils.errors import extract_root_cause_message
+        from ..utils.errors import extract_http_status_error, extract_root_cause_message
 
+        http_error = extract_http_status_error(exc)
+        if http_error is not None:
+            logger.error(
+                "Single-usage stdio request: downstream returned %d: %s",
+                http_error.response.status_code,
+                str(http_error.request.url),
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=http_error.response.status_code,
+                detail={"error": str(http_error), "url": str(http_error.request.url)},
+            ) from exc
         error_message = extract_root_cause_message(exc)
         logger.error("Single-usage stdio request failed: %s", error_message, exc_info=True)
         raise HTTPException(
@@ -190,7 +200,7 @@ async def _execute_http_request(
 
     try:
         async with get_transport_ctx(request, headers) as (read, write, *rest):
-            async with ClientSession(read, write, client_info=CLIENT_INFO) as session:
+            async with ClientSession(read, write, client_info=get_client_info()) as session:
                 # Initialize with timeout
                 await asyncio.wait_for(session.initialize(), timeout=INIT_TIMEOUT_SECONDS)
 
@@ -215,8 +225,20 @@ async def _execute_http_request(
             },
         ) from exc
     except Exception as exc:
-        from ..utils.errors import extract_root_cause_message
+        from ..utils.errors import extract_http_status_error, extract_root_cause_message
 
+        http_error = extract_http_status_error(exc)
+        if http_error is not None:
+            logger.error(
+                "Single-usage HTTP request: downstream returned %d: %s",
+                http_error.response.status_code,
+                str(http_error.request.url),
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=http_error.response.status_code,
+                detail={"error": str(http_error), "url": str(http_error.request.url)},
+            ) from exc
         error_message = extract_root_cause_message(exc)
         logger.error("Single-usage HTTP request failed: %s", error_message, exc_info=True)
         raise HTTPException(
@@ -245,7 +267,7 @@ async def _execute_sse_request(
             timeout=HTTP_TIMEOUT_SECONDS,
             sse_read_timeout=SSE_READ_TIMEOUT_SECONDS,
         ) as (read, write):
-            async with ClientSession(read, write, client_info=CLIENT_INFO) as session:
+            async with ClientSession(read, write, client_info=get_client_info()) as session:
                 # Initialize with timeout
                 await asyncio.wait_for(session.initialize(), timeout=INIT_TIMEOUT_SECONDS)
 
@@ -270,8 +292,20 @@ async def _execute_sse_request(
             },
         ) from exc
     except Exception as exc:
-        from ..utils.errors import extract_root_cause_message
+        from ..utils.errors import extract_http_status_error, extract_root_cause_message
 
+        http_error = extract_http_status_error(exc)
+        if http_error is not None:
+            logger.error(
+                "Single-usage SSE request: downstream returned %d: %s",
+                http_error.response.status_code,
+                str(http_error.request.url),
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=http_error.response.status_code,
+                detail={"error": str(http_error), "url": str(http_error.request.url)},
+            ) from exc
         error_message = extract_root_cause_message(exc)
         logger.error("Single-usage SSE request failed: %s", error_message, exc_info=True)
         raise HTTPException(

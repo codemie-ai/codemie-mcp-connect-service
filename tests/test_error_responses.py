@@ -461,6 +461,70 @@ class TestErrorResponseExamples:
             assert response["request_id"] == "validation-test-uuid"
 
 
+class TestExtractHttpStatusError:
+    """Test extraction of httpx.HTTPStatusError from exceptions."""
+
+    def test_returns_http_status_error_directly(self):
+        """Bare httpx.HTTPStatusError is returned as-is."""
+        import httpx
+
+        from src.mcp_connect.utils.errors import extract_http_status_error
+
+        request = httpx.Request("POST", "https://example.com/mcp")
+        response = httpx.Response(401, request=request)
+        exc = httpx.HTTPStatusError("401 Unauthorized", request=request, response=response)
+
+        result = extract_http_status_error(exc)
+
+        assert result is exc
+
+    def test_returns_none_for_non_http_exception(self):
+        """Non-HTTP exceptions return None."""
+        from src.mcp_connect.utils.errors import extract_http_status_error
+
+        result = extract_http_status_error(ValueError("some error"))
+        assert result is None
+
+    def test_extracts_http_status_error_from_exception_group(self):
+        """httpx.HTTPStatusError nested in ExceptionGroup is extracted."""
+        import httpx
+
+        from src.mcp_connect.utils.errors import extract_http_status_error
+
+        request = httpx.Request("POST", "https://example.com/mcp")
+        response = httpx.Response(401, request=request)
+        http_exc = httpx.HTTPStatusError("401 Unauthorized", request=request, response=response)
+        group = BaseExceptionGroup("unhandled errors in a TaskGroup (1 sub-exception)", [http_exc])
+
+        result = extract_http_status_error(group)
+
+        assert result is http_exc
+
+    def test_extracts_http_status_error_from_nested_exception_groups(self):
+        """httpx.HTTPStatusError deeply nested in ExceptionGroups is extracted."""
+        import httpx
+
+        from src.mcp_connect.utils.errors import extract_http_status_error
+
+        request = httpx.Request("POST", "https://example.com/mcp")
+        response = httpx.Response(403, request=request)
+        http_exc = httpx.HTTPStatusError("403 Forbidden", request=request, response=response)
+        inner_group = BaseExceptionGroup("inner group", [http_exc])
+        outer_group = BaseExceptionGroup("outer group", [inner_group])
+
+        result = extract_http_status_error(outer_group)
+
+        assert result is http_exc
+
+    def test_returns_none_when_exception_group_has_no_http_status_error(self):
+        """ExceptionGroup without httpx.HTTPStatusError returns None."""
+        from src.mcp_connect.utils.errors import extract_http_status_error
+
+        group = BaseExceptionGroup("errors", [ValueError("not an http error")])
+        result = extract_http_status_error(group)
+        assert result is None
+
+
 class TestGetLogLevel:
     """Test LOG_LEVEL environment variable reading."""
 

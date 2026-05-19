@@ -31,6 +31,7 @@ from mcp import ClientSession
 from ..models.request import BridgeRequestBody
 from ..utils.logger import get_logger
 from ..utils.masking import mask_sensitive_headers
+from .client_info import get_client_info
 
 logger = get_logger(__name__)
 
@@ -241,7 +242,7 @@ class ManagedClient:
 
         # Enter contexts - these will stay open until cleanup signal
         async with stdio_client(server_params) as (read, write):
-            async with ClientSession(read, write) as session:
+            async with ClientSession(read, write, client_info=get_client_info()) as session:
                 # Initialize session
                 await asyncio.wait_for(session.initialize(), timeout=INIT_TIMEOUT_SECONDS)
 
@@ -275,7 +276,7 @@ class ManagedClient:
         from .transports import get_transport_ctx
 
         async with get_transport_ctx(request, headers) as (read, write, *rest):
-            async with ClientSession(read, write) as session:
+            async with ClientSession(read, write, client_info=get_client_info()) as session:
                 # Initialize session
                 await asyncio.wait_for(session.initialize(), timeout=INIT_TIMEOUT_SECONDS)
 
@@ -312,7 +313,7 @@ class ManagedClient:
             timeout=HTTP_TIMEOUT_SECONDS,
             sse_read_timeout=SSE_READ_TIMEOUT_SECONDS,
         ) as (read, write):
-            async with ClientSession(read, write) as session:
+            async with ClientSession(read, write, client_info=get_client_info()) as session:
                 # Initialize session
                 await asyncio.wait_for(session.initialize(), timeout=INIT_TIMEOUT_SECONDS)
 

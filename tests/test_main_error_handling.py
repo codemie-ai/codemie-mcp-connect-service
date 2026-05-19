@@ -14,6 +14,8 @@
 
 """Tests for main.py error handling and edge cases."""
 
+from typing import Any
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -79,6 +81,125 @@ async def test_http_exception_handler():
 
     assert response.status_code == 503
     assert "Service unavailable" in response.text
+
+
+def _make_http_status_error(status_code: int) -> Any:
+    import httpx
+
+    request = httpx.Request("POST", "https://downstream.example.com/mcp")
+    response = httpx.Response(status_code, request=request)
+    return httpx.HTTPStatusError(f"Client error '{status_code}'", request=request, response=response)
+
+
+@pytest.mark.asyncio
+async def test_cached_client_propagates_401_from_downstream_on_init():
+    """Downstream 401 during client init (ExceptionGroup) → HTTP 401 response."""
+    from unittest.mock import AsyncMock, patch
+
+    exc = _make_http_status_error(401)
+    group = BaseExceptionGroup("unhandled errors in a TaskGroup (1 sub-exception)", [exc])
+
+    client = TestClient(app)
+    with patch("src.mcp_connect.server.routes.get_or_create_client", new_callable=AsyncMock) as mock:
+        mock.side_effect = group
+
+        response = client.post(
+            "/bridge",
+            json={"serverPath": "https://downstream.example.com/mcp", "method": "tools/list", "params": {}},
+        )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_cached_client_propagates_403_from_downstream_on_init():
+    """Downstream 403 during client init → HTTP 403 response."""
+    from unittest.mock import AsyncMock, patch
+
+    exc = _make_http_status_error(403)
+
+    client = TestClient(app)
+    with patch("src.mcp_connect.server.routes.get_or_create_client", new_callable=AsyncMock) as mock:
+        mock.side_effect = exc
+
+        response = client.post(
+            "/bridge",
+            json={"serverPath": "https://downstream.example.com/mcp", "method": "tools/list", "params": {}},
+        )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_cached_client_propagates_401_from_downstream_on_method_call():
+    """Downstream 401 during method call (ExceptionGroup) → HTTP 401 response."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    exc = _make_http_status_error(401)
+    group = BaseExceptionGroup("unhandled errors in a TaskGroup (1 sub-exception)", [exc])
+
+    mock_session = MagicMock()
+    mock_managed = MagicMock()
+
+    client = TestClient(app)
+    with patch("src.mcp_connect.server.routes.get_or_create_client", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = (mock_managed, mock_session)
+        with patch("src.mcp_connect.server.routes.invoke_with_timeout", new_callable=AsyncMock) as mock_invoke:
+            mock_invoke.side_effect = group
+
+            response = client.post(
+                "/bridge",
+                json={"serverPath": "https://downstream.example.com/mcp", "method": "tools/list", "params": {}},
+            )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_cached_client_propagates_404_from_downstream_on_method_call():
+    """Downstream 404 during method call → HTTP 404 response."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    exc = _make_http_status_error(404)
+
+    mock_session = MagicMock()
+    mock_managed = MagicMock()
+
+    client = TestClient(app)
+    with patch("src.mcp_connect.server.routes.get_or_create_client", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = (mock_managed, mock_session)
+        with patch("src.mcp_connect.server.routes.invoke_with_timeout", new_callable=AsyncMock) as mock_invoke:
+            mock_invoke.side_effect = exc
+
+            response = client.post(
+                "/bridge",
+                json={"serverPath": "https://downstream.example.com/mcp", "method": "tools/list", "params": {}},
+            )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_cached_client_detail_includes_error_info_on_downstream_error():
+    """Response detail includes error and url fields when downstream returns HTTP error."""
+    from unittest.mock import AsyncMock, patch
+
+    exc = _make_http_status_error(401)
+    group = BaseExceptionGroup("unhandled errors in a TaskGroup (1 sub-exception)", [exc])
+
+    client = TestClient(app)
+    with patch("src.mcp_connect.server.routes.get_or_create_client", new_callable=AsyncMock) as mock:
+        mock.side_effect = group
+
+        response = client.post(
+            "/bridge",
+            json={"serverPath": "https://downstream.example.com/mcp", "method": "tools/list", "params": {}},
+        )
+
+    assert response.status_code == 401
+    body = response.json()
+    assert "error" in body
+    assert "url" in body
 
 
 @pytest.mark.asyncio

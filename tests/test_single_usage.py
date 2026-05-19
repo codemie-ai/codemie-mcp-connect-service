@@ -445,6 +445,210 @@ class TestHttpRequest:
         assert exc_info.value.status_code == 500
 
 
+class TestHttpRequestDownstreamErrors:
+    """Test that downstream HTTP errors are propagated with correct status codes."""
+
+    def _make_http_status_error(self, status_code: int) -> Any:
+        import httpx
+
+        request = httpx.Request("POST", "https://downstream.example.com/mcp")
+        response = httpx.Response(status_code, request=request)
+        return httpx.HTTPStatusError(
+            f"Client error '{status_code}'",
+            request=request,
+            response=response,
+        )
+
+    @pytest.mark.asyncio
+    async def test_http_propagates_401_from_downstream_bare(self, monkeypatch):
+        """Bare httpx.HTTPStatusError 401 from downstream → HTTPException(401)."""
+        http_exc = self._make_http_status_error(401)
+        fake_context = FakeContext(("read-stream", "write-stream", lambda: "cleanup"))
+
+        def fake_http_client(*args: Any, **kwargs: Any) -> FakeContext:
+            return fake_context
+
+        async def failing_invoke(*args, **kwargs):
+            raise http_exc
+
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.get_transport_ctx", fake_http_client)
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
+        monkeypatch.setattr("src.mcp_connect.client.methods.invoke_mcp_method", failing_invoke)
+
+        request = BridgeRequestBody(serverPath="https://downstream.example.com/mcp", method="tools/list", params={})
+
+        with pytest.raises(HTTPException) as exc_info:
+            await execute_single_usage_request(request, "tools/list", {}, 5000)
+
+        assert exc_info.value.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_http_propagates_401_wrapped_in_exception_group(self, monkeypatch):
+        """httpx.HTTPStatusError 401 wrapped in ExceptionGroup → HTTPException(401)."""
+        http_exc = self._make_http_status_error(401)
+        group = BaseExceptionGroup("unhandled errors in a TaskGroup (1 sub-exception)", [http_exc])
+        fake_context = FakeContext(("read-stream", "write-stream", lambda: "cleanup"))
+
+        def fake_http_client(*args: Any, **kwargs: Any) -> FakeContext:
+            return fake_context
+
+        async def failing_invoke(*args, **kwargs):
+            raise group
+
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.get_transport_ctx", fake_http_client)
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
+        monkeypatch.setattr("src.mcp_connect.client.methods.invoke_mcp_method", failing_invoke)
+
+        request = BridgeRequestBody(serverPath="https://downstream.example.com/mcp", method="tools/list", params={})
+
+        with pytest.raises(HTTPException) as exc_info:
+            await execute_single_usage_request(request, "tools/list", {}, 5000)
+
+        assert exc_info.value.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_http_propagates_403_from_downstream(self, monkeypatch):
+        """httpx.HTTPStatusError 403 → HTTPException(403)."""
+        http_exc = self._make_http_status_error(403)
+        fake_context = FakeContext(("read-stream", "write-stream", lambda: "cleanup"))
+
+        def fake_http_client(*args: Any, **kwargs: Any) -> FakeContext:
+            return fake_context
+
+        async def failing_invoke(*args, **kwargs):
+            raise http_exc
+
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.get_transport_ctx", fake_http_client)
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
+        monkeypatch.setattr("src.mcp_connect.client.methods.invoke_mcp_method", failing_invoke)
+
+        request = BridgeRequestBody(serverPath="https://downstream.example.com/mcp", method="tools/list", params={})
+
+        with pytest.raises(HTTPException) as exc_info:
+            await execute_single_usage_request(request, "tools/list", {}, 5000)
+
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_http_propagates_404_from_downstream(self, monkeypatch):
+        """httpx.HTTPStatusError 404 → HTTPException(404)."""
+        http_exc = self._make_http_status_error(404)
+        fake_context = FakeContext(("read-stream", "write-stream", lambda: "cleanup"))
+
+        def fake_http_client(*args: Any, **kwargs: Any) -> FakeContext:
+            return fake_context
+
+        async def failing_invoke(*args, **kwargs):
+            raise http_exc
+
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.get_transport_ctx", fake_http_client)
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
+        monkeypatch.setattr("src.mcp_connect.client.methods.invoke_mcp_method", failing_invoke)
+
+        request = BridgeRequestBody(serverPath="https://downstream.example.com/mcp", method="tools/list", params={})
+
+        with pytest.raises(HTTPException) as exc_info:
+            await execute_single_usage_request(request, "tools/list", {}, 5000)
+
+        assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_http_detail_includes_downstream_url_and_status(self, monkeypatch):
+        """HTTPException detail includes downstream URL and status code."""
+        http_exc = self._make_http_status_error(401)
+        fake_context = FakeContext(("read-stream", "write-stream", lambda: "cleanup"))
+
+        def fake_http_client(*args: Any, **kwargs: Any) -> FakeContext:
+            return fake_context
+
+        async def failing_invoke(*args, **kwargs):
+            raise http_exc
+
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.get_transport_ctx", fake_http_client)
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
+        monkeypatch.setattr("src.mcp_connect.client.methods.invoke_mcp_method", failing_invoke)
+
+        request = BridgeRequestBody(serverPath="https://downstream.example.com/mcp", method="tools/list", params={})
+
+        with pytest.raises(HTTPException) as exc_info:
+            await execute_single_usage_request(request, "tools/list", {}, 5000)
+
+        detail = exc_info.value.detail
+        assert isinstance(detail, dict)
+        assert "error" in detail
+
+
+class TestSseRequestDownstreamErrors:
+    """Test that downstream HTTP errors are propagated correctly for SSE transport."""
+
+    def _make_http_status_error(self, status_code: int) -> Any:
+        import httpx
+
+        request = httpx.Request("GET", "https://sse.example.com/mcp")
+        response = httpx.Response(status_code, request=request)
+        return httpx.HTTPStatusError(
+            f"Client error '{status_code}'",
+            request=request,
+            response=response,
+        )
+
+    @pytest.mark.asyncio
+    async def test_sse_propagates_401_from_downstream(self, monkeypatch):
+        """httpx.HTTPStatusError 401 from SSE downstream → HTTPException(401)."""
+        http_exc = self._make_http_status_error(401)
+        fake_context = FakeContext(("read-stream", "write-stream"))
+
+        def fake_sse_client(*args: Any, **kwargs: Any) -> FakeContext:
+            return fake_context
+
+        async def failing_invoke(*args, **kwargs):
+            raise http_exc
+
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.sse_client", fake_sse_client)
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
+        monkeypatch.setattr("src.mcp_connect.client.methods.invoke_mcp_method", failing_invoke)
+
+        request = BridgeRequestBody(
+            serverPath="https://sse.example.com/mcp",
+            method="tools/list",
+            params={},
+            http_transport_type="sse",
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await execute_single_usage_request(request, "tools/list", {}, 5000)
+
+        assert exc_info.value.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_sse_propagates_403_from_downstream(self, monkeypatch):
+        """httpx.HTTPStatusError 403 from SSE downstream → HTTPException(403)."""
+        http_exc = self._make_http_status_error(403)
+        fake_context = FakeContext(("read-stream", "write-stream"))
+
+        def fake_sse_client(*args: Any, **kwargs: Any) -> FakeContext:
+            return fake_context
+
+        async def failing_invoke(*args, **kwargs):
+            raise http_exc
+
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.sse_client", fake_sse_client)
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
+        monkeypatch.setattr("src.mcp_connect.client.methods.invoke_mcp_method", failing_invoke)
+
+        request = BridgeRequestBody(
+            serverPath="https://sse.example.com/mcp",
+            method="tools/list",
+            params={},
+            http_transport_type="sse",
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await execute_single_usage_request(request, "tools/list", {}, 5000)
+
+        assert exc_info.value.status_code == 403
+
+
 class TestSseRequest:
     """Test _execute_sse_request implementation."""
 
