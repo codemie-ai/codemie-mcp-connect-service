@@ -50,7 +50,13 @@ RUN apt-get update && \
         gnupg \
         libcairo2 \
         procps \
-    && apt-get install -y --no-install-recommends --only-upgrade openssl libssl3t64 openssl-provider-legacy && \
+    # TODO: Remove once python:3.12-slim ships with libcap2 >= 1:2.75-10+deb13u1 (CVE-2026-4878)
+    #       and libsystemd0/libudev1 >= 257.13-1~deb13u1 (CVE-2026-29111)
+    && apt-get install -y --no-install-recommends --only-upgrade \
+        openssl libssl3t64 openssl-provider-legacy \
+        "libcap2=1:2.75-10+deb13u1+b1" \
+        "libsystemd0=257.13-1~deb13u1" \
+        "libudev1=257.13-1~deb13u1" && \
     curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/setup_node.sh && \
     bash /tmp/setup_node.sh && \
     apt-get install -y --no-install-recommends nodejs && \
