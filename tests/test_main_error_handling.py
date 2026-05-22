@@ -83,11 +83,15 @@ async def test_http_exception_handler():
     assert "Service unavailable" in response.text
 
 
-def _make_http_status_error(status_code: int) -> Any:
+def _make_http_status_error(
+    status_code: int,
+    body: bytes = b"",
+    headers: dict[str, str] | None = None,
+) -> Any:
     import httpx
 
     request = httpx.Request("POST", "https://downstream.example.com/mcp")
-    response = httpx.Response(status_code, request=request)
+    response = httpx.Response(status_code, content=body, headers=headers or {}, request=request)
     return httpx.HTTPStatusError(f"Client error '{status_code}'", request=request, response=response)
 
 
@@ -255,3 +259,170 @@ async def test_cleanup_scheduler_cancellation():
     with patch("asyncio.sleep", side_effect=asyncio.CancelledError()):
         # Should exit gracefully
         await _cleanup_scheduler(cache)
+
+
+@pytest.mark.asyncio
+async def test_downstream_401_forwards_www_authenticate_header():
+    """WWW-Authenticate from downstream 401 is forwarded as response header."""
+    from unittest.mock import AsyncMock, patch
+
+    exc = _make_http_status_error(
+        401,
+        body=b'{"error": "invalid_token"}',
+        headers={"WWW-Authenticate": 'Bearer realm="example"'},
+    )
+
+    client = TestClient(app)
+    with patch("src.mcp_connect.server.routes.get_or_create_client", new_callable=AsyncMock) as mock:
+        mock.side_effect = exc
+
+        response = client.post(
+            "/bridge",
+            json={"serverPath": "https://downstream.example.com/mcp", "method": "tools/list", "params": {}},
+        )
+
+    assert response.status_code == 401
+    assert "www-authenticate" in {k.lower() for k in response.headers}
+
+
+@pytest.mark.asyncio
+async def test_downstream_401_forwards_response_body_in_detail():
+    """JSON body from downstream 401 is included in the error response body."""
+    from unittest.mock import AsyncMock, patch
+
+    exc = _make_http_status_error(
+        401,
+        body=b'{"error": "invalid_token", "error_description": "Token expired"}',
+    )
+
+    client = TestClient(app)
+    with patch("src.mcp_connect.server.routes.get_or_create_client", new_callable=AsyncMock) as mock:
+        mock.side_effect = exc
+
+        response = client.post(
+            "/bridge",
+            json={"serverPath": "https://downstream.example.com/mcp", "method": "tools/list", "params": {}},
+        )
+
+    assert response.status_code == 401
+    body = response.json()
+    assert "response" in body
+    assert body["response"]["error"] == "invalid_token"
+
+
+@pytest.mark.asyncio
+async def test_downstream_401_method_call_forwards_www_authenticate_header():
+    """WWW-Authenticate from downstream 401 during method call is forwarded."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    exc = _make_http_status_error(
+        401,
+        headers={"WWW-Authenticate": 'Bearer realm="example"'},
+    )
+    group = BaseExceptionGroup("unhandled errors in a TaskGroup (1 sub-exception)", [exc])
+
+    mock_session = MagicMock()
+    mock_managed = MagicMock()
+
+    client = TestClient(app)
+    with patch("src.mcp_connect.server.routes.get_or_create_client", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = (mock_managed, mock_session)
+        with patch("src.mcp_connect.server.routes.invoke_with_timeout", new_callable=AsyncMock) as mock_invoke:
+            mock_invoke.side_effect = group
+
+            response = client.post(
+                "/bridge",
+                json={"serverPath": "https://downstream.example.com/mcp", "method": "tools/list", "params": {}},
+            )
+
+    assert response.status_code == 401
+    assert "www-authenticate" in {k.lower() for k in response.headers}
+
+
+@pytest.mark.asyncio
+async def test_downstream_401_method_call_forwards_response_body_in_detail():
+    """single_usage=false: JSON body from downstream 401 during method call included in detail."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    exc = _make_http_status_error(
+        401,
+        body=b'{"error": "invalid_token", "error_description": "Token expired"}',
+    )
+    group = BaseExceptionGroup("unhandled errors in a TaskGroup (1 sub-exception)", [exc])
+
+    mock_session = MagicMock()
+    mock_managed = MagicMock()
+
+    client = TestClient(app)
+    with patch("src.mcp_connect.server.routes.get_or_create_client", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = (mock_managed, mock_session)
+        with patch("src.mcp_connect.server.routes.invoke_with_timeout", new_callable=AsyncMock) as mock_invoke:
+            mock_invoke.side_effect = group
+
+            response = client.post(
+                "/bridge",
+                json={"serverPath": "https://downstream.example.com/mcp", "method": "tools/list", "params": {}},
+            )
+
+    assert response.status_code == 401
+    body = response.json()
+    assert "response" in body
+    assert body["response"]["error"] == "invalid_token"
+
+
+@pytest.mark.asyncio
+async def test_single_usage_true_downstream_401_forwards_www_authenticate_header():
+    """single_usage=true: WWW-Authenticate from downstream 401 forwarded to client."""
+    from unittest.mock import AsyncMock, patch
+
+    exc = _make_http_status_error(
+        401,
+        headers={"WWW-Authenticate": 'Bearer realm="example"'},
+    )
+
+    client = TestClient(app)
+    with patch("src.mcp_connect.server.routes.execute_single_usage_request", new_callable=AsyncMock) as mock:
+        mock.side_effect = exc
+
+        response = client.post(
+            "/bridge",
+            json={
+                "serverPath": "https://downstream.example.com/mcp",
+                "method": "tools/list",
+                "params": {},
+                "single_usage": True,
+            },
+        )
+
+    assert response.status_code == 401
+    assert "www-authenticate" in {k.lower() for k in response.headers}
+
+
+@pytest.mark.asyncio
+async def test_single_usage_true_downstream_401_forwards_response_body_in_detail():
+    """single_usage=true: JSON body from downstream 401 included in error response."""
+    from unittest.mock import AsyncMock, patch
+
+    exc = _make_http_status_error(
+        401,
+        body=b'{"error": "invalid_token", "error_description": "Token expired"}',
+    )
+
+    client = TestClient(app)
+    with patch("src.mcp_connect.server.routes.execute_single_usage_request", new_callable=AsyncMock) as mock:
+        mock.side_effect = exc
+
+        response = client.post(
+            "/bridge",
+            json={
+                "serverPath": "https://downstream.example.com/mcp",
+                "method": "tools/list",
+                "params": {},
+                "single_usage": True,
+            },
+        )
+
+    assert response.status_code == 401
+    body = response.json()
+    assert "response" in body
+    assert body["response"]["error"] == "invalid_token"

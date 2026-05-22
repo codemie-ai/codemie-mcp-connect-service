@@ -448,11 +448,16 @@ class TestHttpRequest:
 class TestHttpRequestDownstreamErrors:
     """Test that downstream HTTP errors are propagated with correct status codes."""
 
-    def _make_http_status_error(self, status_code: int) -> Any:
+    def _make_http_status_error(
+        self,
+        status_code: int,
+        body: bytes = b"",
+        headers: dict[str, str] | None = None,
+    ) -> Any:
         import httpx
 
         request = httpx.Request("POST", "https://downstream.example.com/mcp")
-        response = httpx.Response(status_code, request=request)
+        response = httpx.Response(status_code, content=body, headers=headers or {}, request=request)
         return httpx.HTTPStatusError(
             f"Client error '{status_code}'",
             request=request,
@@ -576,6 +581,62 @@ class TestHttpRequestDownstreamErrors:
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
         assert "error" in detail
+
+    @pytest.mark.asyncio
+    async def test_http_detail_includes_json_response_body(self, monkeypatch):
+        """JSON body from downstream 401 is parsed and included in HTTPException detail."""
+        http_exc = self._make_http_status_error(
+            401,
+            body=b'{"error": "invalid_token", "error_description": "Token expired"}',
+        )
+        fake_context = FakeContext(("read-stream", "write-stream", lambda: "cleanup"))
+
+        def fake_http_client(*args: Any, **kwargs: Any) -> FakeContext:
+            return fake_context
+
+        async def failing_invoke(*args, **kwargs):
+            raise http_exc
+
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.get_transport_ctx", fake_http_client)
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
+        monkeypatch.setattr("src.mcp_connect.client.methods.invoke_mcp_method", failing_invoke)
+
+        request = BridgeRequestBody(serverPath="https://downstream.example.com/mcp", method="tools/list", params={})
+
+        with pytest.raises(HTTPException) as exc_info:
+            await execute_single_usage_request(request, "tools/list", {}, 5000)
+
+        detail = exc_info.value.detail
+        assert "response" in detail
+        assert detail["response"]["error"] == "invalid_token"
+        assert detail["response"]["error_description"] == "Token expired"
+
+    @pytest.mark.asyncio
+    async def test_http_forwards_www_authenticate_header(self, monkeypatch):
+        """WWW-Authenticate header from downstream 401 is set on the HTTPException."""
+        http_exc = self._make_http_status_error(
+            401,
+            headers={"WWW-Authenticate": 'Bearer realm="example"'},
+        )
+        fake_context = FakeContext(("read-stream", "write-stream", lambda: "cleanup"))
+
+        def fake_http_client(*args: Any, **kwargs: Any) -> FakeContext:
+            return fake_context
+
+        async def failing_invoke(*args, **kwargs):
+            raise http_exc
+
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.get_transport_ctx", fake_http_client)
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
+        monkeypatch.setattr("src.mcp_connect.client.methods.invoke_mcp_method", failing_invoke)
+
+        request = BridgeRequestBody(serverPath="https://downstream.example.com/mcp", method="tools/list", params={})
+
+        with pytest.raises(HTTPException) as exc_info:
+            await execute_single_usage_request(request, "tools/list", {}, 5000)
+
+        exc_headers = exc_info.value.headers or {}
+        assert "www-authenticate" in {k.lower() for k in exc_headers}
 
 
 class TestSseRequestDownstreamErrors:

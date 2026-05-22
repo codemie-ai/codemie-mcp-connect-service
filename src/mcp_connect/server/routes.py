@@ -29,6 +29,7 @@ from ..client.single_usage import execute_single_usage_request
 from ..models import BridgeRequestBody
 from ..utils.context import get_request_context, get_request_id
 from ..utils.errors import (
+    build_downstream_error_response,
     extract_error_details,
     extract_http_status_error,
     extract_root_cause_message,
@@ -145,9 +146,11 @@ async def _handle_single_usage_request(request: BridgeRequestBody, timeout_ms: i
     except Exception as exc:
         http_error = extract_http_status_error(exc)
         if http_error is not None:
+            detail, headers = build_downstream_error_response(http_error)
             raise HTTPException(
                 status_code=http_error.response.status_code,
-                detail={"error": str(http_error), "url": str(http_error.request.url)},
+                detail=detail,
+                headers=headers or None,
             ) from exc
         base_msg = "MCP method execution failed"
         if not isinstance(exc, BaseExceptionGroup):
@@ -185,9 +188,11 @@ async def _handle_cached_client_request(request: BridgeRequestBody, timeout_ms: 
     except Exception as exc:
         http_error = extract_http_status_error(exc)
         if http_error is not None:
+            detail, headers = build_downstream_error_response(http_error)
             raise HTTPException(
                 status_code=http_error.response.status_code,
-                detail={"error": str(http_error), "url": str(http_error.request.url)},
+                detail=detail,
+                headers=headers or None,
             ) from exc
         base_msg = "Failed to create MCP client"
         if not isinstance(exc, BaseExceptionGroup):
@@ -219,9 +224,11 @@ async def _handle_cached_client_request(request: BridgeRequestBody, timeout_ms: 
     except Exception as exc:
         http_error = extract_http_status_error(exc)
         if http_error is not None:
+            detail, headers = build_downstream_error_response(http_error)
             raise HTTPException(
                 status_code=http_error.response.status_code,
-                detail={"error": str(http_error), "url": str(http_error.request.url)},
+                detail=detail,
+                headers=headers or None,
             ) from exc
         base_msg = "MCP method execution failed"
         if not isinstance(exc, BaseExceptionGroup):

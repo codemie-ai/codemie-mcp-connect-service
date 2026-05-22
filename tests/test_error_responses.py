@@ -20,6 +20,7 @@ request_id integration, and security (no sensitive data in responses).
 
 import asyncio
 import os
+from typing import Any
 from unittest.mock import patch
 
 from pydantic import BaseModel, Field, ValidationError
@@ -523,6 +524,120 @@ class TestExtractHttpStatusError:
         group = BaseExceptionGroup("errors", [ValueError("not an http error")])
         result = extract_http_status_error(group)
         assert result is None
+
+
+class TestBuildDownstreamErrorResponse:
+    """Test build_downstream_error_response builds detail + headers from HTTPStatusError."""
+
+    def _make_error(
+        self,
+        status_code: int,
+        body: bytes = b"",
+        headers: dict[str, str] | None = None,
+    ) -> Any:
+        import httpx
+
+        request = httpx.Request("POST", "https://downstream.example.com/mcp")
+        response = httpx.Response(status_code, content=body, headers=headers or {}, request=request)
+        return httpx.HTTPStatusError(f"{status_code}", request=request, response=response)
+
+    def test_detail_contains_error_and_url(self):
+        """Detail always includes error message and downstream URL."""
+        from src.mcp_connect.utils.errors import build_downstream_error_response
+
+        http_error = self._make_error(401)
+        detail, _ = build_downstream_error_response(http_error)
+
+        assert "error" in detail
+        assert "url" in detail
+        assert "downstream.example.com" in detail["url"]
+
+    def test_detail_includes_json_response_body(self):
+        """JSON response body from downstream is parsed and included as dict."""
+        from src.mcp_connect.utils.errors import build_downstream_error_response
+
+        body = b'{"error": "invalid_token", "error_description": "Token has expired"}'
+        http_error = self._make_error(401, body=body)
+        detail, _ = build_downstream_error_response(http_error)
+
+        assert "response" in detail
+        assert detail["response"]["error"] == "invalid_token"
+        assert detail["response"]["error_description"] == "Token has expired"
+
+    def test_detail_includes_plain_text_response_body(self):
+        """Non-JSON response body is included as raw string."""
+        from src.mcp_connect.utils.errors import build_downstream_error_response
+
+        http_error = self._make_error(401, body=b"Unauthorized")
+        detail, _ = build_downstream_error_response(http_error)
+
+        assert detail["response"] == "Unauthorized"
+
+    def test_detail_omits_response_key_when_body_is_empty(self):
+        """Empty response body is not included in detail."""
+        from src.mcp_connect.utils.errors import build_downstream_error_response
+
+        http_error = self._make_error(401, body=b"")
+        detail, _ = build_downstream_error_response(http_error)
+
+        assert "response" not in detail
+
+    def test_forwards_www_authenticate_header(self):
+        """WWW-Authenticate header from downstream is forwarded."""
+        from src.mcp_connect.utils.errors import build_downstream_error_response
+
+        http_error = self._make_error(401, headers={"WWW-Authenticate": 'Bearer realm="example"'})
+        _, headers = build_downstream_error_response(http_error)
+
+        assert (
+            headers.get("www-authenticate") == 'Bearer realm="example"'
+            or headers.get("WWW-Authenticate") == 'Bearer realm="example"'
+        )
+
+    def test_forwards_custom_error_headers(self):
+        """Custom error headers (e.g. X-Auth-URL) from downstream are forwarded."""
+        from src.mcp_connect.utils.errors import build_downstream_error_response
+
+        http_error = self._make_error(401, headers={"X-Auth-URL": "https://auth.example.com/login"})
+        _, headers = build_downstream_error_response(http_error)
+
+        assert "https://auth.example.com/login" in headers.values()
+
+    def test_skips_content_type_header(self):
+        """content-type is not forwarded (FastAPI manages response content-type)."""
+        from src.mcp_connect.utils.errors import build_downstream_error_response
+
+        http_error = self._make_error(401, headers={"Content-Type": "application/json"})
+        _, headers = build_downstream_error_response(http_error)
+
+        assert "content-type" not in {k.lower() for k in headers}
+
+    def test_skips_content_length_header(self):
+        """content-length is not forwarded (FastAPI calculates it)."""
+        from src.mcp_connect.utils.errors import build_downstream_error_response
+
+        http_error = self._make_error(401, body=b"body", headers={"Content-Length": "4"})
+        _, headers = build_downstream_error_response(http_error)
+
+        assert "content-length" not in {k.lower() for k in headers}
+
+    def test_skips_transfer_encoding_header(self):
+        """transfer-encoding is a hop-by-hop header and must not be forwarded."""
+        from src.mcp_connect.utils.errors import build_downstream_error_response
+
+        http_error = self._make_error(401, headers={"Transfer-Encoding": "chunked"})
+        _, headers = build_downstream_error_response(http_error)
+
+        assert "transfer-encoding" not in {k.lower() for k in headers}
+
+    def test_returns_empty_headers_dict_when_no_forwardable_headers(self):
+        """Returns empty headers dict when downstream only has non-forwardable headers."""
+        from src.mcp_connect.utils.errors import build_downstream_error_response
+
+        http_error = self._make_error(401, headers={"Content-Type": "application/json", "Content-Length": "0"})
+        _, headers = build_downstream_error_response(http_error)
+
+        assert headers == {}
 
 
 class TestGetLogLevel:

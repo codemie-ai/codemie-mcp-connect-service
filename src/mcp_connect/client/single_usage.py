@@ -166,7 +166,11 @@ async def _execute_stdio_request(
             },
         ) from exc
     except Exception as exc:
-        from ..utils.errors import extract_http_status_error, extract_root_cause_message
+        from ..utils.errors import (
+            build_downstream_error_response,
+            extract_http_status_error,
+            extract_root_cause_message,
+        )
 
         http_error = extract_http_status_error(exc)
         if http_error is not None:
@@ -176,9 +180,11 @@ async def _execute_stdio_request(
                 str(http_error.request.url),
                 exc_info=True,
             )
+            detail, headers = build_downstream_error_response(http_error)
             raise HTTPException(
                 status_code=http_error.response.status_code,
-                detail={"error": str(http_error), "url": str(http_error.request.url)},
+                detail=detail,
+                headers=headers or None,
             ) from exc
         error_message = extract_root_cause_message(exc)
         logger.error("Single-usage stdio request failed: %s", error_message, exc_info=True)
@@ -225,7 +231,11 @@ async def _execute_http_request(
             },
         ) from exc
     except Exception as exc:
-        from ..utils.errors import extract_http_status_error, extract_root_cause_message
+        from ..utils.errors import (
+            build_downstream_error_response,
+            extract_http_status_error,
+            extract_root_cause_message,
+        )
 
         http_error = extract_http_status_error(exc)
         if http_error is not None:
@@ -235,9 +245,11 @@ async def _execute_http_request(
                 str(http_error.request.url),
                 exc_info=True,
             )
+            detail, headers = build_downstream_error_response(http_error)
             raise HTTPException(
                 status_code=http_error.response.status_code,
-                detail={"error": str(http_error), "url": str(http_error.request.url)},
+                detail=detail,
+                headers=headers or None,
             ) from exc
         error_message = extract_root_cause_message(exc)
         logger.error("Single-usage HTTP request failed: %s", error_message, exc_info=True)
@@ -292,7 +304,11 @@ async def _execute_sse_request(
             },
         ) from exc
     except Exception as exc:
-        from ..utils.errors import extract_http_status_error, extract_root_cause_message
+        from ..utils.errors import (
+            build_downstream_error_response,
+            extract_http_status_error,
+            extract_root_cause_message,
+        )
 
         http_error = extract_http_status_error(exc)
         if http_error is not None:
@@ -302,9 +318,11 @@ async def _execute_sse_request(
                 str(http_error.request.url),
                 exc_info=True,
             )
+            detail, headers = build_downstream_error_response(http_error)
             raise HTTPException(
                 status_code=http_error.response.status_code,
-                detail={"error": str(http_error), "url": str(http_error.request.url)},
+                detail=detail,
+                headers=headers or None,
             ) from exc
         error_message = extract_root_cause_message(exc)
         logger.error("Single-usage SSE request failed: %s", error_message, exc_info=True)

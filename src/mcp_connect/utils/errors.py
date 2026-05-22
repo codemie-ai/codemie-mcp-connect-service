@@ -35,6 +35,7 @@ Usage:
 """
 
 import asyncio
+import json
 import traceback
 from collections.abc import Callable
 from typing import Any
@@ -202,6 +203,63 @@ def extract_http_status_error(exception: BaseException) -> httpx.HTTPStatusError
                 return result
 
     return None
+
+
+_SKIP_RESPONSE_HEADERS = frozenset(
+    {
+        # Hop-by-hop headers (RFC 2616 §13.5.1)
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailers",
+        "transfer-encoding",
+        "upgrade",
+        # Content management — FastAPI rebuilds the response body and sets these itself
+        "content-encoding",
+        "content-length",
+        "content-type",
+    }
+)
+
+
+def build_downstream_error_response(
+    http_error: httpx.HTTPStatusError,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Build HTTPException detail and forwarding headers from a downstream HTTPStatusError.
+
+    Extracts the response body and headers so callers can forward them to clients,
+    enabling proper error diagnosis (e.g. WWW-Authenticate headers for 401 responses).
+
+    Args:
+        http_error: The HTTP error raised by the downstream service
+
+    Returns:
+        Tuple of (detail_dict, headers_dict):
+        - detail_dict: contains "error", "url", and optionally "response" (body)
+        - headers_dict: safe downstream headers to pass through (hop-by-hop skipped)
+    """
+    detail: dict[str, Any] = {
+        "error": str(http_error),
+        "url": str(http_error.request.url),
+    }
+
+    try:
+        body = http_error.response.text
+        if body:
+            try:
+                detail["response"] = json.loads(body)
+            except (ValueError, TypeError):
+                detail["response"] = body
+    except Exception:
+        pass
+
+    forwarded_headers: dict[str, str] = {
+        k: v for k, v in http_error.response.headers.items() if k.lower() not in _SKIP_RESPONSE_HEADERS
+    }
+
+    return detail, forwarded_headers
 
 
 def extract_root_cause_message(exception: Exception) -> str:
