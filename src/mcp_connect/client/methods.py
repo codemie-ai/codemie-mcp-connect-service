@@ -86,12 +86,18 @@ async def invoke_mcp_method(
     if normalized_method == "tools/call":
         name = _require_param(payload, "name")
         arguments = _optional_mapping_param(payload, "arguments")
+        clean_arguments = _strip_none_values(arguments)
+        logger.debug(
+            "Stripped %d null argument(s) for tool %s",
+            len(arguments) - len(clean_arguments),
+            name,
+        )
         logger.info(
             "Calling tool: %s with arguments: %s",
             name,
-            _mask_params_recursive(arguments),
+            _mask_params_recursive(clean_arguments),
         )
-        return await session.call_tool(name, arguments)
+        return await session.call_tool(name, clean_arguments)
 
     if normalized_method == "prompts/list":
         logger.debug("Calling prompts/list with cursor: %s", payload.get("cursor"))
@@ -198,6 +204,17 @@ def _require_param(params: dict[str, Any], key: str) -> Any:
     masked_value = REDACTED_VALUE if is_sensitive_key(key) else _mask_params_recursive(value)
     logger.debug("Retrieved required parameter: %s = %s", key, masked_value)
     return value
+
+
+def _strip_none_values(data: dict[str, Any]) -> dict[str, Any]:
+    """Recursively remove keys with None values from a dict.
+
+    MCP servers with strict schemas (e.g. Zod) reject explicitly-null optional
+    fields. Omitting them satisfies the schema without changing semantics.
+    """
+    if not data:
+        return data
+    return {k: _strip_none_values(v) if isinstance(v, dict) else v for k, v in data.items() if v is not None}
 
 
 def _optional_mapping_param(params: dict[str, Any], key: str) -> dict[str, Any]:

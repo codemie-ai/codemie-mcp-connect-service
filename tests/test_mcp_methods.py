@@ -94,6 +94,40 @@ async def test_tools_call_with_arguments(session) -> None:
 
 
 @pytest.mark.asyncio
+async def test_tools_call_strips_null_arguments(session) -> None:
+    """Null optional fields must be omitted — MCP servers with strict Zod schemas reject explicit nulls."""
+    await invoke_mcp_method(
+        session,
+        "tools/call",
+        {"name": "query_prometheus", "arguments": {"query": "up", "endTime": None, "stepSeconds": None}},
+    )
+
+    session.call_tool.assert_awaited_once_with("query_prometheus", {"query": "up"})
+
+
+@pytest.mark.asyncio
+async def test_tools_call_strips_null_arguments_nested(session) -> None:
+    await invoke_mcp_method(
+        session,
+        "tools/call",
+        {"name": "my_tool", "arguments": {"filter": {"active": True, "namespace": None}, "limit": None}},
+    )
+
+    session.call_tool.assert_awaited_once_with("my_tool", {"filter": {"active": True}})
+
+
+@pytest.mark.asyncio
+async def test_tools_call_preserves_falsy_non_none_values(session) -> None:
+    await invoke_mcp_method(
+        session,
+        "tools/call",
+        {"name": "my_tool", "arguments": {"count": 0, "label": "", "active": False}},
+    )
+
+    session.call_tool.assert_awaited_once_with("my_tool", {"count": 0, "label": "", "active": False})
+
+
+@pytest.mark.asyncio
 async def test_prompts_list_without_cursor(session) -> None:
     result = await invoke_mcp_method(session, "prompts/list", None)
 
