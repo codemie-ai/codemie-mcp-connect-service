@@ -181,10 +181,13 @@ RUN git clone --depth 1 --recursive https://github.com/modelcontextprotocol/serv
 WORKDIR /codemie/servers
 RUN rm -rf src/everything
 
+# TODO: Remove once modelcontextprotocol/servers ships with vitest >= 4.1.0
+# Remediation for CVE-2026-47429 (vitest < 4.1.0 critical vulnerability)
 RUN npm pkg set 'overrides.esbuild'='>=0.27.4' && \
     npm pkg set 'overrides.@isaacs/brace-expansion'='>=5.0.1' && \
     npm pkg set 'overrides.tar'='>=7.5.11' && \
     npm pkg set 'overrides.picomatch'='>=4.0.4' && \
+    npm pkg set 'overrides.vitest'='>=4.1.0' && \
     rm -f package-lock.json
 RUN --mount=type=cache,target=/root/.npm \
     npm install && npm run build && npm run link-all
