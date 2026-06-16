@@ -16,12 +16,16 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 from mcp.types import ListToolsResult, Tool
+
+from mcp_connect.client import manager as manager_module
+from mcp_connect.client.managed import ManagedClient
 
 pytestmark = pytest.mark.asyncio
 
@@ -272,6 +276,30 @@ async def test_env_with_null_values_is_accepted_and_converted(
 
     assert response.status_code == 200
     assert response.json() == {"result": "pong"}
+
+
+async def test_disallowed_stdio_command_returns_400(
+    async_client: httpx.AsyncClient,
+) -> None:
+    """Disallowed stdio commands must be rejected before any subprocess is spawned."""
+    mock_cache = MagicMock()
+    mock_cache.get = AsyncMock(return_value=None)  # simulate cache miss so spawn is attempted
+
+    async def _fail_stdio(request: object, cleanup_event: object, ready_future: object) -> None:
+        cast_future: asyncio.Future[object] = ready_future  # type: ignore[assignment]
+        cast_future.set_exception(RuntimeError("subprocess intentionally blocked in test"))
+
+    with (
+        patch.object(manager_module, "_client_cache", mock_cache),
+        patch.object(ManagedClient, "_run_stdio_client", new=_fail_stdio),
+    ):
+        response = await async_client.post(
+            "/bridge",
+            json={"serverPath": "bash", "method": "ping", "params": {}},
+        )
+
+    assert response.status_code == 400
+    assert "not allowed" in response.json()["error"]
 
 
 async def test_env_with_mixed_types_is_accepted_and_converted(

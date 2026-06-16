@@ -75,6 +75,7 @@ include = '\.pyi?$'
 [tool.ruff]
 line-length = 120
 target-version = "py312"
+exclude = ["ai-run-mcp-servers"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]

@@ -128,7 +128,7 @@ class TestSingleUsageClientName:
         from src.mcp_connect.client.single_usage import execute_single_usage_request
         from src.mcp_connect.models.request import BridgeRequestBody
 
-        request = BridgeRequestBody(serverPath="echo", method="tools/list", params={})
+        request = BridgeRequestBody(serverPath="uvx", method="tools/list", params={})
         await execute_single_usage_request(request, "tools/list", {}, 5000)
 
         assert len(captured) == 1
@@ -150,7 +150,7 @@ class TestSingleUsageClientName:
         from src.mcp_connect.client.single_usage import execute_single_usage_request
         from src.mcp_connect.models.request import BridgeRequestBody
 
-        request = BridgeRequestBody(serverPath="echo", method="tools/list", params={})
+        request = BridgeRequestBody(serverPath="uvx", method="tools/list", params={})
         await execute_single_usage_request(request, "tools/list", {}, 5000)
 
         assert len(captured) == 1
@@ -233,7 +233,7 @@ class TestManagedClientName:
         from src.mcp_connect.client.managed import ManagedClient
         from src.mcp_connect.models.request import BridgeRequestBody
 
-        request = BridgeRequestBody(serverPath="echo", method="tools/list", params={})
+        request = BridgeRequestBody(serverPath="uvx", method="tools/list", params={})
 
         with patch("mcp.client.stdio.stdio_client", return_value=fake_stdio_ctx):
             task = asyncio.create_task(ManagedClient._run_stdio_client(request, cleanup_event, ready_future))

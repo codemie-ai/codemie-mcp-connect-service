@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException
@@ -34,6 +35,19 @@ logger = get_logger(__name__)
 
 # Module-level cache instance (initialized at startup)
 _client_cache: MCPClientCache | None = None
+
+_ALLOWED_STDIO_COMMANDS: frozenset[str] = frozenset(
+    {
+        "uvx",
+        "npx",
+        "mcp-server-filesystem",
+        "mcp-server-memory",
+        "mcp-server-sequential-thinking",
+        "mcp-server-postgres",
+        "mcp-server-puppeteer",
+        "mcp-mermaid",
+    }
+)
 
 
 async def invoke_with_timeout(
@@ -111,6 +125,18 @@ def detect_transport_type(server_path: str, http_transport_type: str | None = No
     if server_path.startswith(("http://", "https://")):  # noqa: S105
         # Default to streamable-http, allow override to sse for backward compatibility
         return "sse" if http_transport_type == "sse" else "streamable-http"
+
+    cmd = Path(server_path).name
+    if cmd not in _ALLOWED_STDIO_COMMANDS:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": (
+                    f"Command '{cmd}' is not allowed for stdio transport. "
+                    f"Allowed commands: {', '.join(sorted(_ALLOWED_STDIO_COMMANDS))}."
+                )
+            },
+        )
 
     return "stdio"
 
