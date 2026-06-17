@@ -22,6 +22,7 @@ A Helm chart for AI/Run MCP Connect service
 |-----|------|---------|-------------|
 | affinity | object | `{}` | Assign affinity rules to the statefulset |
 | env | list | `[]` | List of extra environment variables to be used by the MCP Connect |
+| extraObjects | list | `[]` | Array of extra Kubernetes manifests to deploy |
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the MCP Connect |
 | image.repository | string | `""` | Repository to use for the MCP Connect |

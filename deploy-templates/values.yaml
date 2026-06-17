@@ -124,3 +124,16 @@ tolerations: []
 
 # -- Assign affinity rules to the statefulset
 affinity: {}
+
+# -- Array of extra Kubernetes manifests to deploy
+extraObjects: []
+  # - apiVersion: external-secrets.io/v1beta1
+  #   kind: ExternalSecret
+  #   metadata:
+  #     name: example-secret-1
+  #   spec:
+  #     data:
+  #       - remoteRef:
+  #           key: /example/deploy-secrets
+  #           property: example-secret-1.username
+  #         secretKey: username
