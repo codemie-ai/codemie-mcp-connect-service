@@ -38,8 +38,12 @@ _client_cache: MCPClientCache | None = None
 
 _ALLOWED_STDIO_COMMANDS: frozenset[str] = frozenset(
     {
+        # linux/macos
         "uvx",
         "npx",
+        # windows
+        "npx.cmd",
+        # built in
         "mcp-server-filesystem",
         "mcp-server-memory",
         "mcp-server-sequential-thinking",
