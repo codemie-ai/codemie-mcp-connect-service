@@ -57,8 +57,10 @@ RUN git clone --branch latest-release --depth 1 https://github.com/github/github
 # TODO: Remove once github-mcp-server ships with modelcontextprotocol/go-sdk >= v1.4.1
 # Remediation for CVE-2026-27896 and CVE-2026-33252 (go-sdk vulnerable versions bundled in github-mcp-server, fixed in v1.4.1)
 # Note: v1.4.1 fixes CSRF/Origin-header validation (CVE-2026-33252) in Streamable HTTP transport
+# Security (EPMCDME-13101): pin golang.org/x/net >=0.55.0 to fix CVE-2026-25680/81, CVE-2026-27136, CVE-2026-33814, CVE-2026-39821, CVE-2026-42502/06 (HIGH vulns in transitive net dependency)
 RUN --mount=type=cache,target=/go/pkg/mod \
     go get github.com/modelcontextprotocol/go-sdk@v1.4.1 && \
+    go get golang.org/x/net@v0.55.0 && \
     go mod tidy
 
 # Build with architecture support and optimizations
