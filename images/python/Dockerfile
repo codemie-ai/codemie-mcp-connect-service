@@ -80,6 +80,15 @@ RUN apt-get update && \
     mkdir -p /tmp/venv && \
     chown -R codemie:codemie /tmp/venv
 
+# Security (EPMCDME-13007): replace npm's bundled undici 6.26.0 with 6.27.0 to fix CVE-2026-12151
+# Install in an isolated prefix (avoids npm reading its own package.json and resolving internal deps)
+RUN mkdir /tmp/undici-fix && \
+    npm --prefix /tmp/undici-fix install undici@6.27.0 && \
+    npm_root=$(npm root -g) && \
+    rm -rf "${npm_root}/npm/node_modules/undici" && \
+    cp -r /tmp/undici-fix/node_modules/undici "${npm_root}/npm/node_modules/" && \
+    rm -rf /tmp/undici-fix
+
 # Set working directory
 WORKDIR /home/codemie
 
