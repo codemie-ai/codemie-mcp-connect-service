@@ -130,6 +130,15 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
 # Update npm to latest stable version
 RUN npm install -g npm@latest
 
+# Security (EPMCDME-13002): replace npm's bundled undici with >=6.27.0 to fix CVE-2026-12151 (undici DoS via fragment count bypass)
+RUN set -eux && \
+    tmpdir=$(mktemp -d) && \
+    npm pack undici@">=6.27.0" --pack-destination "$tmpdir" && \
+    tar -xzf "$tmpdir"/undici-*.tgz -C "$tmpdir" && \
+    rm -rf /usr/lib/node_modules/npm/node_modules/undici && \
+    mv "$tmpdir/package" /usr/lib/node_modules/npm/node_modules/undici && \
+    rm -rf "$tmpdir"
+
 # Install Maven
 ENV MAVEN_VERSION=3.9.16
 ENV MAVEN_HOME=/opt/apache-maven-${MAVEN_VERSION}
