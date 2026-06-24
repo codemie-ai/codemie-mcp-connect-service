@@ -91,7 +91,7 @@ class TestExecuteSingleUsageRequest:
         monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
 
         request = BridgeRequestBody(
-            serverPath="uvx",
+            serverPath="echo",
             method="tools/list",
             params={},
             args=["hello"],
@@ -182,7 +182,7 @@ class TestExecuteSingleUsageRequest:
         monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
 
         request = BridgeRequestBody(
-            serverPath="uvx",
+            serverPath="echo",
             method="tools/list",
             params={},
             env={"TOKEN": "$env:MY_TOKEN"},
@@ -209,7 +209,7 @@ class TestStdioRequest:
         monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
 
         request = BridgeRequestBody(
-            serverPath="uvx",
+            serverPath="python",
             method="tools/call",
             params={"name": "echo", "arguments": {"text": "hello"}},
             args=["-m", "mcp_server"],
@@ -248,7 +248,7 @@ class TestStdioRequest:
         monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", SlowDummySession)
 
         request = BridgeRequestBody(
-            serverPath="uvx",
+            serverPath="slow_command",
             method="tools/call",
             params={"name": "slow_tool"},
             args=[],
@@ -293,7 +293,7 @@ class TestStdioRequest:
         monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", ModeratelySlowDummySession)
 
         request = BridgeRequestBody(
-            serverPath="uvx",
+            serverPath="slow_init_command",
             method="tools/list",
             params={},
             args=[],
@@ -325,7 +325,7 @@ class TestStdioRequest:
         monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", FailingDummySession)
 
         request = BridgeRequestBody(
-            serverPath="uvx",
+            serverPath="failing_command",
             method="tools/call",
             params={},
         )
@@ -353,7 +353,7 @@ class TestStdioRequest:
         monkeypatch.setattr("src.mcp_connect.client.methods.invoke_mcp_method", slow_invoke)
 
         request = BridgeRequestBody(
-            serverPath="uvx",
+            serverPath="slow_method_command",
             method="tools/list",
             params={},
         )

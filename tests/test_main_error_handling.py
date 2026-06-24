@@ -47,7 +47,7 @@ async def test_generic_exception_handler():
         response = client.post(
             "/bridge",
             json={
-                "serverPath": "uvx",
+                "serverPath": "test",
                 "method": "ping",
                 "params": {},
             },

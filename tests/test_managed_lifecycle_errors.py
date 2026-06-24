@@ -27,7 +27,7 @@ from src.mcp_connect.models.request import BridgeRequestBody
 def stdio_request():
     """Create a sample stdio request."""
     return BridgeRequestBody(
-        serverPath="uvx",
+        serverPath="python",
         method="ping",
         params={},
         args=["-u", "fixtures/json_rpc_server.py"],
@@ -178,27 +178,17 @@ async def test_lifecycle_sets_exception_on_cancellation(stdio_request):
     cleanup_event = asyncio.Event()
     ready_future = asyncio.Future()
 
-    async def _hanging_stdio(*_args: object, **_kwargs: object) -> None:
-        await asyncio.sleep(100)
+    # Run lifecycle with immediate cancellation
+    task = asyncio.create_task(ManagedClient._run_client_lifecycle(stdio_request, cleanup_event, ready_future))
 
-    # Mock _run_stdio_client to hang so cancel always wins before any subprocess exits.
-    # Without this, uvx fails immediately on CI (uvx -u is invalid), causing ExceptionGroup
-    # to land on ready_future before task.cancel() is delivered.
-    with patch.object(
-        ManagedClient,
-        "_run_stdio_client",
-        new=AsyncMock(side_effect=_hanging_stdio),
-    ):
-        task = asyncio.create_task(ManagedClient._run_client_lifecycle(stdio_request, cleanup_event, ready_future))
+    # Cancel immediately
+    await asyncio.sleep(0.01)
+    task.cancel()
 
-        # Cancel immediately
-        await asyncio.sleep(0.01)
-        task.cancel()
-
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
     # Ready future should have exception set
     assert ready_future.done()
@@ -291,27 +281,17 @@ async def test_stdio_lifecycle_handles_cancellation(stdio_request):
     cleanup_event = asyncio.Event()
     ready_future = asyncio.Future()
 
-    class _HangingStdioClient:
-        def __call__(self, *args, **kwargs):
-            return self
+    # Create a task and cancel it immediately
+    task = asyncio.create_task(ManagedClient._run_stdio_client(stdio_request, cleanup_event, ready_future))
 
-        async def __aenter__(self):
-            await asyncio.sleep(100)
+    # Cancel after a brief delay
+    await asyncio.sleep(0.01)
+    task.cancel()
 
-        async def __aexit__(self, *args):
-            pass
-
-    with patch("mcp.client.stdio.stdio_client", new=_HangingStdioClient()):
-        task = asyncio.create_task(ManagedClient._run_stdio_client(stdio_request, cleanup_event, ready_future))
-
-        # Cancel after a brief delay
-        await asyncio.sleep(0.01)
-        task.cancel()
-
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
     # Ready future should have exception if not already resolved
     if not ready_future.done():
