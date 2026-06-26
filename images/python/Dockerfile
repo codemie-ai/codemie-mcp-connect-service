@@ -57,6 +57,8 @@ RUN apt-get update && \
         "libcap2=1:2.75-10+deb13u1+b1" \
         "libsystemd0=257.13-1~deb13u1" \
         "libudev1=257.13-1~deb13u1" && \
+    # Security (EPMCDME-13179): pin libssh2-1t64 >=1.11.1-1+deb13u1 to fix CVE-2026-55200, CVE-2026-7598 (Debian trixie security update for libssh2)
+    apt-get install -y --no-install-recommends --only-upgrade "libssh2-1t64=1.11.1-1+deb13u1" && \
     curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/setup_node.sh && \
     bash /tmp/setup_node.sh && \
     apt-get install -y --no-install-recommends nodejs && \
