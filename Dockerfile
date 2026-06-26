@@ -116,6 +116,8 @@ RUN apt-get update && apt-get upgrade -y && \
         chromium \
         chromium-common && \
     apt-get install -y --no-install-recommends --only-upgrade chromium chromium-common && \
+    # Security (EPMCDME-13180): pin libssh2-1t64 >=1.11.1-1+deb13u1 to fix CVE-2026-55200, CVE-2026-7598 (Debian trixie security update for libssh2)
+    apt-get install -y --no-install-recommends --only-upgrade "libssh2-1t64=1.11.1-1+deb13u1" && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
