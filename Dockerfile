@@ -54,12 +54,9 @@ RUN --mount=type=cache,target=/var/cache/apk \
 # Clone and build GitHub MCP Server from specific tag
 RUN git clone --branch latest-release --depth 1 https://github.com/github/github-mcp-server.git .
 
-# TODO: Remove once github-mcp-server ships with modelcontextprotocol/go-sdk >= v1.4.1
-# Remediation for CVE-2026-27896 and CVE-2026-33252 (go-sdk vulnerable versions bundled in github-mcp-server, fixed in v1.4.1)
-# Note: v1.4.1 fixes CSRF/Origin-header validation (CVE-2026-33252) in Streamable HTTP transport
+# TODO: Remove once github-mcp-server ships with golang.org/x/net >= v0.55.0
 # Security (EPMCDME-13101): pin golang.org/x/net >=0.55.0 to fix CVE-2026-25680/81, CVE-2026-27136, CVE-2026-33814, CVE-2026-39821, CVE-2026-42502/06 (HIGH vulns in transitive net dependency)
 RUN --mount=type=cache,target=/go/pkg/mod \
-    go get github.com/modelcontextprotocol/go-sdk@v1.4.1 && \
     go get golang.org/x/net@v0.55.0 && \
     go mod tidy
 
@@ -116,8 +113,6 @@ RUN apt-get update && apt-get upgrade -y && \
         chromium \
         chromium-common && \
     apt-get install -y --no-install-recommends --only-upgrade chromium chromium-common && \
-    # Security (EPMCDME-13180): pin libssh2-1t64 >=1.11.1-1+deb13u1 to fix CVE-2026-55200, CVE-2026-7598 (Debian trixie security update for libssh2)
-    apt-get install -y --no-install-recommends --only-upgrade "libssh2-1t64=1.11.1-1+deb13u1" && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -131,15 +126,6 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
 
 # Update npm to latest stable version
 RUN npm install -g npm@latest
-
-# Security (EPMCDME-13002): replace npm's bundled undici with >=6.27.0 to fix CVE-2026-12151 (undici DoS via fragment count bypass)
-RUN set -eux && \
-    tmpdir=$(mktemp -d) && \
-    npm pack undici@">=6.27.0" --pack-destination "$tmpdir" && \
-    tar -xzf "$tmpdir"/undici-*.tgz -C "$tmpdir" && \
-    rm -rf /usr/lib/node_modules/npm/node_modules/undici && \
-    mv "$tmpdir/package" /usr/lib/node_modules/npm/node_modules/undici && \
-    rm -rf "$tmpdir"
 
 # Install Maven
 ENV MAVEN_VERSION=3.9.16
@@ -194,14 +180,6 @@ RUN git clone --depth 1 --recursive https://github.com/modelcontextprotocol/serv
 WORKDIR /codemie/servers
 RUN rm -rf src/everything
 
-# TODO: Remove once modelcontextprotocol/servers ships with vitest >= 4.1.0
-# Remediation for CVE-2026-47429 (vitest < 4.1.0 critical vulnerability)
-RUN npm pkg set 'overrides.esbuild'='>=0.27.4' && \
-    npm pkg set 'overrides.@isaacs/brace-expansion'='>=5.0.1' && \
-    npm pkg set 'overrides.tar'='>=7.5.11' && \
-    npm pkg set 'overrides.picomatch'='>=4.0.4' && \
-    npm pkg set 'overrides.vitest'='>=4.1.0' && \
-    rm -f package-lock.json
 RUN --mount=type=cache,target=/root/.npm \
     npm install && npm run build && npm run link-all
 
@@ -225,10 +203,7 @@ RUN --mount=type=cache,target=/root/.npm \
 RUN mkdir -p /codemie/additional-tools && \
     git clone --depth 1 https://github.com/zcaceres/fetch-mcp.git /codemie/additional-tools/fetch-mcp
 WORKDIR /codemie/additional-tools/fetch-mcp
-RUN npm pkg set 'overrides.esbuild'='>=0.27.4' && \
-    npm pkg set 'overrides.@isaacs/brace-expansion'='>=5.0.1' && \
-    npm pkg set 'overrides.tar'='>=7.5.11' && \
-    npm pkg set 'overrides.picomatch'='>=4.0.4' && \
+RUN npm pkg set 'overrides.picomatch'='>=4.0.4' && \
     rm -f package-lock.json
 RUN --mount=type=cache,target=/root/.npm \
     npm install
