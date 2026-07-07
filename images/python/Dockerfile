@@ -49,25 +49,10 @@ RUN apt-get update && \
         git \
         gnupg \
         libcairo2 \
-        procps \
-    # TODO: Remove once python:3.12-slim ships with libcap2 >= 1:2.75-10+deb13u1 (CVE-2026-4878)
-    #       and libsystemd0/libudev1 >= 257.13-1~deb13u1 (CVE-2026-29111)
-    && apt-get install -y --no-install-recommends --only-upgrade \
-        openssl libssl3t64 openssl-provider-legacy \
-        "libcap2=1:2.75-10+deb13u1+b1" \
-        "libsystemd0=257.13-1~deb13u1" \
-        "libudev1=257.13-1~deb13u1" && \
-    # Security (EPMCDME-13179): pin libssh2-1t64 >=1.11.1-1+deb13u1 to fix CVE-2026-55200, CVE-2026-7598 (Debian trixie security update for libssh2)
-    apt-get install -y --no-install-recommends --only-upgrade "libssh2-1t64=1.11.1-1+deb13u1" && \
+        procps && \
     curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/setup_node.sh && \
     bash /tmp/setup_node.sh && \
     apt-get install -y --no-install-recommends nodejs && \
-    # TODO: workaround for npm self-upgrade bug: NodeSource Node 22 ships with npm@10.9.7
-    # whose @npmcli/arborist lacks eager require of 'promise-retry', causing MODULE_NOT_FOUND
-    # when upgrading directly to npm@11.12.0. Intermediate step to 10.9.8 (which has a working
-    # arborist for self-upgrade) resolves this. Fixed upstream in arborist@8.0.5 (npm@11.12.1+).
-    # Remove the @10.9.8 line once npm ships with arborist>=8.0.5 bundled.
-    npm install -g npm@10.9.8 && \
     npm install -g npm && \
     npm install -g @anthropic-ai/claude-code && \
     rm /tmp/setup_node.sh && \
@@ -81,15 +66,6 @@ RUN apt-get update && \
     useradd --uid 1001 --gid 1001 --shell /bin/bash --create-home codemie && \
     mkdir -p /tmp/venv && \
     chown -R codemie:codemie /tmp/venv
-
-# Security (EPMCDME-13007): replace npm's bundled undici 6.26.0 with 6.27.0 to fix CVE-2026-12151
-# Install in an isolated prefix (avoids npm reading its own package.json and resolving internal deps)
-RUN mkdir /tmp/undici-fix && \
-    npm --prefix /tmp/undici-fix install undici@6.27.0 && \
-    npm_root=$(npm root -g) && \
-    rm -rf "${npm_root}/npm/node_modules/undici" && \
-    cp -r /tmp/undici-fix/node_modules/undici "${npm_root}/npm/node_modules/" && \
-    rm -rf /tmp/undici-fix
 
 # Set working directory
 WORKDIR /home/codemie
