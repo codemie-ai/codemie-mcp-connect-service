@@ -15,7 +15,7 @@ python = "^3.12"
 fastapi = "^0.134.0"  # Security (EPMCDME-12876): >=0.134.0 removes starlette<1.0.0 cap, enabling starlette 1.3.1 pin
 uvicorn = {version = "^0.38.0", extras = ["standard"]}
 pydantic = "^2.12.0"
-mcp = "^1.23.0"
+mcp = ">=1.28.1"  # Security (EPMCDME-13569): pin >=1.28.1 to fix CVE-2026-52869, CVE-2026-52870, CVE-2026-59950 (mcp High/High vuln)
 urllib3 = "^2.7.0"
 python-dotenv = "^1.2.1"
 python-json-logger = "^4.0.0"
