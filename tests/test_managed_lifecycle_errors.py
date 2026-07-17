@@ -15,12 +15,15 @@
 """Tests for ManagedClient lifecycle error handling."""
 
 import asyncio
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.mcp_connect.client.managed import ManagedClient
 from src.mcp_connect.models.request import BridgeRequestBody
+
+FIXTURE_SERVER = str(Path(__file__).parent / "fixtures" / "json_rpc_server.py")
 
 
 @pytest.fixture
@@ -30,7 +33,7 @@ def stdio_request():
         serverPath="python",
         method="ping",
         params={},
-        args=["-u", "fixtures/json_rpc_server.py"],
+        args=["-u", FIXTURE_SERVER],
     )
 
 
@@ -178,17 +181,27 @@ async def test_lifecycle_sets_exception_on_cancellation(stdio_request):
     cleanup_event = asyncio.Event()
     ready_future = asyncio.Future()
 
-    # Run lifecycle with immediate cancellation
-    task = asyncio.create_task(ManagedClient._run_client_lifecycle(stdio_request, cleanup_event, ready_future))
+    # Mock stdio_client to hang so cancellation happens deterministically
+    # while the transport is being established (before ready_future resolves).
+    async def hang_forever(*args, **kwargs):
+        await asyncio.Event().wait()
 
-    # Cancel immediately
-    await asyncio.sleep(0.01)
-    task.cancel()
+    mock_ctx = MagicMock()
+    mock_ctx.__aenter__ = AsyncMock(side_effect=hang_forever)
+    mock_ctx.__aexit__ = AsyncMock(return_value=None)
 
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    with patch("mcp.client.stdio.stdio_client", return_value=mock_ctx):
+        # Run lifecycle with immediate cancellation
+        task = asyncio.create_task(ManagedClient._run_client_lifecycle(stdio_request, cleanup_event, ready_future))
+
+        # Cancel while transport is hanging
+        await asyncio.sleep(0.01)
+        task.cancel()
+
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
     # Ready future should have exception set
     assert ready_future.done()
@@ -281,25 +294,28 @@ async def test_stdio_lifecycle_handles_cancellation(stdio_request):
     cleanup_event = asyncio.Event()
     ready_future = asyncio.Future()
 
-    # Create a task and cancel it immediately
-    task = asyncio.create_task(ManagedClient._run_stdio_client(stdio_request, cleanup_event, ready_future))
+    # Mock stdio_client to hang so cancellation happens deterministically
+    # while the transport is being established (before initialization).
+    async def hang_forever(*args, **kwargs):
+        await asyncio.Event().wait()
 
-    # Cancel after a brief delay
-    await asyncio.sleep(0.01)
-    task.cancel()
+    mock_ctx = MagicMock()
+    mock_ctx.__aenter__ = AsyncMock(side_effect=hang_forever)
+    mock_ctx.__aexit__ = AsyncMock(return_value=None)
 
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    with patch("mcp.client.stdio.stdio_client", return_value=mock_ctx):
+        # Create a task and cancel it while the transport is hanging
+        task = asyncio.create_task(ManagedClient._run_stdio_client(stdio_request, cleanup_event, ready_future))
 
-    # Ready future should have exception if not already resolved
-    if not ready_future.done():
-        # Cancellation happened before initialization
-        pass
-    else:
-        # Check if it completed or got exception
-        assert ready_future.done()
+        # Cancel after a brief delay
+        await asyncio.sleep(0.01)
+        task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    # Cancellation happened before initialization, so ready_future stays unresolved
+    assert not ready_future.done()
 
 
 @pytest.mark.asyncio
