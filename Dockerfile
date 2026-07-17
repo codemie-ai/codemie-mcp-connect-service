@@ -41,7 +41,8 @@
 # ==============================================================================
 # Stage 1: Build GitHub MCP Server (Go)
 # ==============================================================================
-FROM dhi.io/golang:1.25-alpine3.23-dev AS github-mcp-build
+# Security (EPMCDME-13515): bump to alpine3.24 base to pick up Go 1.25.12, fixing CVE-2026-39822 in stdlib
+FROM dhi.io/golang:1.25-alpine3.24-dev AS github-mcp-build
 ARG VERSION="dev"
 ARG TARGETARCH
 
@@ -49,7 +50,7 @@ WORKDIR /build
 
 # Install git for cloning
 RUN --mount=type=cache,target=/var/cache/apk \
-    apk add --no-cache git~=2.52
+    apk add --no-cache git~=2.54
 
 # Clone and build GitHub MCP Server from specific tag
 RUN git clone --branch latest-release --depth 1 https://github.com/github/github-mcp-server.git .
