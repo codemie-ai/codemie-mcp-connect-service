@@ -1,0 +1,11 @@
+{
+  "attribution": {
+    "commit": "Generated with AI\n\nCo-Authored-By: codemie-ai <codemie.ai@gmail.com>",
+    "pr": ""
+  },
+  "enabledPlugins": {
+    "superpowers@superpowers-dev": true,
+    "superpowers@claude-plugins-official": true,
+    "sdlc-factory@sdlc-factory": true
+  }
+}

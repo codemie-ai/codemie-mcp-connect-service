@@ -2,6 +2,31 @@
 
 This file provides guidance to AI agents (OpenAI GPT, Anthropic Claude, and others) when working with code in this repository.
 
+<!-- START managed: sdlc-factory guide-imports -->
+## AI Development Guides
+
+| Guide | Purpose |
+|---|---|
+| [Project Context](.ai-run/guides/project.md) | Project identity, ticket/MR adapters, source control |
+| [Architecture](.ai-run/guides/architecture/architecture.md) | System design, components, data flow |
+| [Setup](.ai-run/guides/setup.md) | Development environment, dependencies, commands |
+| [Quality Gates](.ai-run/guides/quality-gates.md) | Lint, format, type-check, test, security scan |
+| [Git Workflow](.ai-run/guides/standards/git-workflow.md) | Branch naming, commits, MR creation |
+| [Testing](.ai-run/guides/testing/testing-patterns.md) | Test organization, coverage, running tests |
+| [Development Practices](.ai-run/guides/development/development-practices.md) | Type hints, async patterns, error handling, API docs |
+<!-- END managed: sdlc-factory guide-imports -->
+
+<!-- START managed: sdlc-factory task-classifier -->
+## Task Routing
+
+When working on this repository:
+- **New feature/refactor/bug with ticket** → use sdlc-factory:sdlc-standard skill
+- **Security/CVE remediation** → use security-lead skill
+- **Commit + MR creation** → use gitlab-mr skill
+- **Code review** → use gitlab-mr-code-review or sdlc-factory:code-review skill
+- **Quick fixes without ticket** → proceed with standard workflow, reference guides above
+<!-- END managed: sdlc-factory task-classifier -->
+
 ## 🚀 Project Overview
 
 **CodeMie MCP Connect Service** - Production FastAPI-based bridge service that enables cloud-based AI platforms to interact with local MCP servers through HTTP/HTTPS to stdio protocol translation.

@@ -87,3 +87,10 @@ bmad/*
 .gemini/*
 local/*
 .codemie/
+
+# AI
+.ai-run/sdlc-factory/
+.ai-run/runs/
+.agents/memory/sdlc/daily/
+docs/superpowers/tasks/*/.state.json
+.claude/settings.local.json
