@@ -189,6 +189,11 @@ RUN git clone --depth 1 --recursive https://github.com/modelcontextprotocol/serv
 WORKDIR /codemie/servers
 RUN rm -rf src/everything
 
+# Security: force brace-expansion >=5.0.7 (CVE-2026-13149)
+# and fast-uri >=3.1.4 (CVE-2026-16221) tree-wide
+RUN npm pkg set 'overrides.brace-expansion'='>=5.0.7' 'overrides.fast-uri'='>=3.1.4' && \
+    rm -f package-lock.json
+
 RUN --mount=type=cache,target=/root/.npm \
     npm install && npm run build && npm run link-all
 
