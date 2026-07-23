@@ -77,17 +77,9 @@ ARG TARGETARCH
 # hadolint ignore=DL3002
 USER root
 
-# TODO: Temporary pin, remove once Chromium 150 browser automation crash is fixed upstream.
-# 149 is no longer served by the live Debian mirror (only broken 150 remains), so it is
-# pulled from a temporary snapshot.debian.org source, removed again once installed.
-ARG CHROMIUM_VERSION=149.0.7827.196-1~deb13u1
-ARG CHROMIUM_SNAPSHOT=20260625T165532Z
-
 # Install comprehensive system dependencies
 # hadolint ignore=DL3008
-RUN echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/${CHROMIUM_SNAPSHOT}/ trixie-security main" \
-        > /etc/apt/sources.list.d/chromium-snapshot.list && \
-    apt-get update && apt-get upgrade -y && \
+RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         # Core utilities
         wget \
@@ -119,9 +111,8 @@ RUN echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-s
         libxkbcommon0 \
         libgbm1 \
         libasound2 \
-        chromium=${CHROMIUM_VERSION} \
-        chromium-common=${CHROMIUM_VERSION} && \
-    rm -f /etc/apt/sources.list.d/chromium-snapshot.list && \
+        chromium \
+        chromium-common && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
