@@ -12,83 +12,60 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lightweight Python runtime for executing custom Python scripts
-# Optimized for minimal image size
-FROM python:3.12-slim
+FROM dhi.io/python:3.12.13-debian13-dev
 
-# Version pinning for reproducible builds
-#ARG GIT_VERSION=1:2.47.3-0+deb13u1
-#ARG CURL_VERSION=8.14.1-2
-#ARG GNUPG_VERSION=2.4.7-21
-#ARG NODE_VERSION=22.20.0-1nodesource1
-#ARG CLAUDE_CODE_VERSION=2.0.22
-#ARG NPM_VERSION=10.9.3
-#ARG PROCPS_VERSION=2:4.0.4-9
-ARG SIMPLE_DECK_VERSION=4.2.12.77+3ad7d6e
+ARG LIBCAIRO2_VERSION=1.18.4-1+b1
+ARG LIBRAQM0_VERSION=0.10.2-1
+ARG PIP_VERSION=26.0
+ARG SIMPLE_DECK_VERSION=6.0.8
 ARG INSTALL_SIMPLE_DECK=false
 
-# Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PATH="/tmp/venv/bin:/usr/local/bin:${PATH}"
+    PIP_NO_CACHE_DIR=1 \
+    PATH="/opt/venv/bin:/usr/local/bin:${PATH}"
 
-# Install system dependencies, create user, and set up directories in a single optimized layer
-# This minimizes image size by:
-# 1. Combining all operations in one RUN command
-# 2. Using --no-install-recommends to avoid unnecessary packages
-# 3. Cleaning up all package manager caches and temporary files in the same layer
-# 4. Pinning versions for reproducible builds
+# libcairo2 is required by CairoSVG/simple-deck.
+# libraqm0 provides complex text layout support for Pillow.
 #
-# libcairo2 is required by cairosvg for SVG rendering (simple-deck dependency)
-#
-# hadolint ignore=DL3008,DL3016
+# hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        curl \
-        git \
-        gnupg \
-        libcairo2 \
-        procps && \
-    curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/setup_node.sh && \
-    bash /tmp/setup_node.sh && \
-    apt-get install -y --no-install-recommends nodejs && \
-    npm install -g npm && \
-    npm install -g @anthropic-ai/claude-code && \
-    rm /tmp/setup_node.sh && \
+        "libcairo2=${LIBCAIRO2_VERSION}" \
+        "libraqm0=${LIBRAQM0_VERSION}" && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* \
-           /var/cache/apt/archives/* \
-           /root/.npm \
-           /tmp/* \
-           /var/tmp/* && \
-    groupadd --gid 1001 codemie && \
-    useradd --uid 1001 --gid 1001 --shell /bin/bash --create-home codemie && \
-    mkdir -p /tmp/venv && \
-    chown -R codemie:codemie /tmp/venv
+    rm -rf \
+        /var/lib/apt/lists/* \
+        /var/cache/apt/archives/* \
+        /tmp/* \
+        /var/tmp/* && \
+    mkdir -p /home/codemie && \
+    chown -R 1001:1001 /home/codemie
 
-# Set working directory
+COPY requirements.txt /tmp/requirements.txt
+
+# Create venv as root so /opt/venv is read-only for unprivileged user (1001:1001) by default.
+# Install dependencies, check environment consistency, and clean up temporary files in a single layer.
+RUN /usr/bin/python3.12 -m venv /opt/venv && \
+    /opt/venv/bin/python -m pip install \
+        --no-cache-dir \
+        --upgrade \
+        "pip==${PIP_VERSION}" && \
+    /opt/venv/bin/python -m pip install \
+        --no-cache-dir \
+        --requirement /tmp/requirements.txt && \
+    if [ "${INSTALL_SIMPLE_DECK}" = "true" ]; then \
+        /opt/venv/bin/python -m pip install \
+            --no-cache-dir \
+            "simple-deck==${SIMPLE_DECK_VERSION}"; \
+    fi && \
+    /opt/venv/bin/python -m pip check && \
+    rm -rf \
+        /tmp/* \
+        /var/tmp/* \
+        /root/.cache
+
 WORKDIR /home/codemie
 
-# Switch to codemie user before installing dependencies
-USER codemie
-
-# Copy requirements file with proper ownership
-COPY --chown=codemie:codemie requirements.txt .
-
-# Create virtual environment and install dependencies in a single layer
-# Using --no-cache-dir to prevent caching and reduce image size
-RUN python -m venv /tmp/venv && \
-    /tmp/venv/bin/pip install --no-cache-dir -r requirements.txt && \
-    rm -rf ~/.cache/pip ~/.local/share/pip
-
-# Install simple-deck from GCP Artifact Registry when INSTALL_SIMPLE_DECK=true
-RUN --mount=type=secret,id=google_credentials,dst=/kaniko/google_credentials.json,uid=1001 \
-    if [ "$INSTALL_SIMPLE_DECK" = "true" ]; then \
-        export GOOGLE_APPLICATION_CREDENTIALS=/kaniko/google_credentials.json; \
-        /tmp/venv/bin/pip install --no-cache-dir keyrings.google-artifactregistry-auth && \
-        /tmp/venv/bin/pip install --no-cache-dir "simple-deck==${SIMPLE_DECK_VERSION}" \
-            --extra-index-url https://europe-west3-python.pkg.dev/or2-msq-epmd-edp-anthos-t1iylu/simple-deck-python/simple/ && \
-        /tmp/venv/bin/pip uninstall -y keyrings.google-artifactregistry-auth && \
-        rm -rf ~/.cache/pip ~/.local/share/pip; \
-    fi
+USER 1001:1001
