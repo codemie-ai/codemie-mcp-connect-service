@@ -57,8 +57,11 @@ RUN git clone --branch latest-release --depth 1 https://github.com/github/github
 
 # TODO: Remove once github-mcp-server ships with golang.org/x/net >= v0.55.0
 # Security (EPMCDME-13101): pin golang.org/x/net >=0.55.0 to fix CVE-2026-25680/81, CVE-2026-27136, CVE-2026-33814, CVE-2026-39821, CVE-2026-42502/06 (HIGH vulns in transitive net dependency)
+# TODO: Remove once github-mcp-server ships with golang.org/x/text >= v0.39.0
+# Security (EPMCDME-13760): pin golang.org/x/text >=0.39.0 to fix CVE-2026-56852 (CWE-835 infinite loop in unicode/utf8 text processing)
 RUN --mount=type=cache,target=/go/pkg/mod \
     go get golang.org/x/net@v0.55.0 && \
+    go get golang.org/x/text@v0.39.0 && \
     go mod tidy
 
 # Build with architecture support and optimizations
