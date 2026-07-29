@@ -127,6 +127,15 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
 # Update npm to latest stable version
 RUN npm install -g npm@latest
 
+# Security: upgrade brace-expansion inside npm's own bundled node_modules
+# to 5.0.8 (CVE-2026-14257 — npm 12.x bundles brace-expansion@5.0.7 internally)
+# npm install --prefix fails for npm's own tree; use pack+extract instead
+RUN mkdir -p /tmp/be-fix && \
+    npm pack brace-expansion@5.0.8 --pack-destination /tmp/be-fix 2>/dev/null && \
+    tar -xzf /tmp/be-fix/brace-expansion-5.0.8.tgz --strip-components=1 \
+        -C /usr/lib/node_modules/npm/node_modules/brace-expansion/ && \
+    rm -rf /tmp/be-fix
+
 # Install Maven
 ENV MAVEN_VERSION=3.9.16
 ENV MAVEN_HOME=/opt/apache-maven-${MAVEN_VERSION}
@@ -180,9 +189,9 @@ RUN git clone --depth 1 --recursive https://github.com/modelcontextprotocol/serv
 WORKDIR /codemie/servers
 RUN rm -rf src/everything
 
-# Security: force brace-expansion >=5.0.7 (CVE-2026-13149)
+# Security: pin brace-expansion >=5.0.8 to fix CVE-2026-14257 (ReDoS in brace-expansion 5.0.7)
 # and fast-uri >=3.1.4 (CVE-2026-16221) tree-wide
-RUN npm pkg set 'overrides.brace-expansion'='>=5.0.7' 'overrides.fast-uri'='>=3.1.4' && \
+RUN npm pkg set 'overrides.brace-expansion'='>=5.0.8' 'overrides.fast-uri'='>=3.1.4' && \
     rm -f package-lock.json
 
 RUN --mount=type=cache,target=/root/.npm \
