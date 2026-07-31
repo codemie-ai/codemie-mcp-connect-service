@@ -299,6 +299,9 @@ COPY --chown=codemie:codemie pyproject.toml poetry.lock README.md ./
 COPY --chown=root:root --chmod=755 create_python_venv.sh /usr/local/bin/create_python_venv.sh
 COPY --chown=root:root --chmod=755 run_in_python_venv.sh /usr/local/bin/run_in_python_venv.sh
 
+# Copy uv constraint file to pin mcp SDK for uvx-run tools (e.g. mcp-server-fetch)
+COPY --chown=root:root --chmod=644 uv-constraints.txt /etc/uv-constraints.txt
+
 # Copy startup script that runs Uvicorn + optional ngrok (owned by root)
 COPY --chown=root:root --chmod=755 start-with-ngrok.sh /usr/local/bin/start-with-ngrok.sh
 
@@ -316,6 +319,9 @@ USER codemie
 # - Maven
 # - Helper scripts (in /usr/local/bin)
 ENV PATH=/codemie/codemie-mcp-connect/.venv/bin:/usr/local/bin:${MAVEN_HOME}/bin:${PATH}
+
+# Pin mcp SDK for all uvx tool installs (mcp-server-fetch uses McpError removed in mcp>=2.0.0)
+ENV UV_CONSTRAINT=/etc/uv-constraints.txt
 
 # Default port (can be overridden via PORT environment variable)
 ENV PORT=3000
