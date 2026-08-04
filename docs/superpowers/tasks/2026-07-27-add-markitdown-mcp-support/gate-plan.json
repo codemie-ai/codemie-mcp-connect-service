@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "runner": "poetry",
+  "gates": [
+    {"id": "format", "command": "source .venv/bin/activate && poetry run ruff format", "available": true},
+    {"id": "lint", "command": "source .venv/bin/activate && poetry run ruff check src/ tests/", "available": true},
+    {"id": "typecheck", "command": "source .venv/bin/activate && poetry run mypy src/", "available": true},
+    {"id": "black-check", "command": "source .venv/bin/activate && poetry run black --check src/ tests/", "available": true},
+    {"id": "unit", "command": "source .venv/bin/activate && poetry run pytest tests/ --cov=src --cov-report=term-missing", "available": true},
+    {"id": "integration", "command": "source .venv/bin/activate && poetry run pytest tests/ -m integration --cov=src --cov-report=term-missing", "available": true},
+    {"id": "gitleaks", "command": "make gitleaks", "available": true}
+  ],
+  "ui_globs": [],
+  "detected_at": "2026-07-27T16:10:00Z"
+}

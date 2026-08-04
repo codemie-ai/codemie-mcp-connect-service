@@ -132,6 +132,70 @@ ngrok: url=https://19c8c59a0579.ngrok-free.app
 
 Use this URL as the MCP-Connect URL when configuring MCP Servers in CodeMie.
 
+### Using markitdown-mcp
+
+The service includes markitdown-mcp for converting various document formats to markdown.
+
+**Supported URI Schemes:**
+- `http://` and `https://` - Remote resources (web pages, PDFs, documents)
+- `file://` - Local files (requires volume mount for access)
+- `data:` - Inline data URIs
+
+**Example: Convert a web page to markdown**
+
+```bash
+curl -X POST http://localhost:3000/bridge \
+  -H "Authorization: Bearer <YourAccessToken>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "serverPath": "python -m markitdown_mcp",
+    "method": "tools/call",
+    "params": {
+      "name": "convert_to_markdown",
+      "arguments": {
+        "uri": "https://example.com/document.pdf"
+      }
+    }
+  }'
+```
+
+**Local Development Usage:**
+
+For local development, use the full path to your virtual environment's Python executable.
+
+Prerequisites:
+```bash
+# Activate virtual environment
+source .venv/bin/activate  # Linux/macOS
+.venv\Scripts\activate     # Windows
+
+# Install markitdown-mcp without dependencies (to avoid MCP version conflicts)
+pip install --no-deps markitdown-mcp
+
+# Install markitdown separately
+pip install markitdown
+```
+
+Example:
+```bash
+curl -X POST http://localhost:3000/bridge \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "serverPath": "/absolute/path/to/project/.venv/bin/python",
+    "args": ["-m", "markitdown_mcp"],
+    "method": "tools/call",
+    "params": {
+      "name": "convert_to_markdown",
+      "arguments": {
+        "uri": "https://www.example.com"
+      }
+    }
+  }'
+```
+
+Note: On Windows, use the full path to `.venv\Scripts\python.exe` and escape backslashes.
+
 ## Development
 
 ### Local Development Setup
@@ -513,6 +577,7 @@ Additional servers from the archived repository for extended functionality.
 |--------|---------|--------------|
 | **GitHub MCP Server** | v0.20.2 | Advanced GitHub integration built in Go, enterprise features |
 | **Fetch MCP** | Latest  | Enhanced HTTP requests and web data fetching |
+| **markitdown-mcp** | Latest  | Document conversion to markdown (supports http:, https:, file:, data: URIs) |
 
 ## Environment Configuration 🔧
 

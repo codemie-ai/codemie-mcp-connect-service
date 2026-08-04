@@ -142,7 +142,12 @@ def _print_startup_banner() -> None:
     ╚═╝     ╚═╝ ╚═════╝╚═╝          ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝ ╚═════╝   ╚═╝
     """
     # Print banner in cyan color using ANSI escape codes
-    print(f"\033[36m{banner}\033[0m")
+    # Handle encoding errors gracefully on Windows
+    try:
+        print(f"\033[36m{banner}\033[0m")
+    except UnicodeEncodeError:
+        # Fallback to plain text banner for terminals that don't support Unicode
+        print("\n=== CodeMie MCP Connect ===\n")
 
 
 @asynccontextmanager

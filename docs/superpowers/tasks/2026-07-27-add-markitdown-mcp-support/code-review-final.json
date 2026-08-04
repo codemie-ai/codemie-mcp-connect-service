@@ -1,0 +1,133 @@
+{
+  "schema": 1,
+  "decision": "request-changes",
+  "rationale": "Integration tests fail due to incorrect httpx.AsyncClient usage pattern, blocking 'Unit/integration tests with passing results' acceptance criterion. Missing http:// and file:// integration tests leave URI scheme coverage incomplete. Five edge cases identified: unhandled ValueError (returns 500 instead of 400), case-sensitive scheme matching (rejects valid uppercase URIs), missing uri parameter not validated, type coercion masks errors, whitespace-only URIs pass validation.",
+  "confidence": "high",
+  "risk_flags": [],
+  "business_review": [
+    {
+      "criterion": "`markitdown-mcp` installed and configured",
+      "status": "met",
+      "notes": "Dockerfile line 262: `RUN pip install --no-cache-dir markitdown-mcp`"
+    },
+    {
+      "criterion": "Service invokes `convert_to_markdown(uri)` for all URI schemes",
+      "status": "partial",
+      "notes": "Integration tests verify https:// and data: schemes. Unit tests verify all four schemes pass validation. Missing: end-to-end integration tests for http:// and file:// schemes."
+    },
+    {
+      "criterion": "Conversion output validated and returned to client",
+      "status": "met",
+      "notes": "Integration tests verify response structure with 'content' field, markdown format validation, and HTTP 200 status."
+    },
+    {
+      "criterion": "Error handling for invalid URIs or conversion failures",
+      "status": "met",
+      "notes": "URI validation layer integrated into methods.py:92-94. Error handling tests cover invalid URI schemes and empty URIs."
+    },
+    {
+      "criterion": "Unit/integration tests with passing results",
+      "status": "fail",
+      "notes": "Unit tests pass (12 tests). Integration tests fail immediately: AsyncClient initialization uses incorrect pattern `AsyncClient(app=app, base_url=...)` instead of `httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=...)`"
+    },
+    {
+      "criterion": "Documentation updated",
+      "status": "met",
+      "notes": "README.md lines 135-176: New 'Using markitdown-mcp' section with URI schemes, usage example, and error handling documentation."
+    }
+  ],
+  "standards_review": [],
+  "findings": [
+    {
+      "id": "CR-001",
+      "severity": "critical",
+      "problem": "Integration tests use incorrect httpx.AsyncClient initialization pattern causing all tests to fail",
+      "impact": "Acceptance criterion 'Unit/integration tests with passing results' is not satisfied - integration tests fail immediately on client initialization with TypeError: AsyncClient.__init__() got an unexpected keyword argument 'app'",
+      "location": {
+        "file": "tests/integration/test_markitdown_mcp.py",
+        "line": 13
+      },
+      "recommendation": "Replace `AsyncClient(app=app, base_url='http://test')` with either: (1) use the async_client fixture from conftest.py, or (2) use the correct pattern: `httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test')`. Pattern is shown in tests/conftest.py:32-37.",
+      "source": ["acceptance"],
+      "triage": "patch"
+    },
+    {
+      "id": "CR-002",
+      "severity": "major",
+      "problem": "Missing end-to-end integration tests for http:// and file:// URI schemes",
+      "impact": "Acceptance criterion 'Service invokes convert_to_markdown(uri) for all URI schemes' is only partially satisfied - only https:// and data: schemes have end-to-end integration tests",
+      "location": {
+        "file": "tests/integration/test_markitdown_mcp.py",
+        "line": 1
+      },
+      "recommendation": "Add integration tests test_convert_to_markdown_http_uri() and test_convert_to_markdown_file_uri() to verify end-to-end conversion for all four supported URI schemes as specified in spec lines 122-123.",
+      "source": ["acceptance"],
+      "triage": "patch"
+    },
+    {
+      "id": "CR-003",
+      "severity": "major",
+      "problem": "ValueError from validate_uri is not caught, propagates as unhandled exception returning HTTP 500 instead of 400 Bad Request",
+      "impact": "Invalid URIs return HTTP 500 with generic 'MCP method execution failed' message instead of HTTP 400 with the clear validation error message from validate_uri ('URI cannot be empty', 'Invalid URI scheme...')",
+      "location": {
+        "file": "src/mcp_connect/client/methods.py",
+        "line": 94
+      },
+      "recommendation": "Wrap validate_uri call in try/except ValueError and raise HTTPException(status_code=400, detail=...) with structured error, OR add ValueError to the exception handlers in routes.py _handle_single_usage_request and _handle_cached_client_request to convert it to 400 Bad Request",
+      "source": ["edge-case"],
+      "triage": "patch"
+    },
+    {
+      "id": "CR-004",
+      "severity": "major",
+      "problem": "Case-sensitive scheme matching fails for uppercase schemes like 'HTTP://example.com' or 'HTTPS://example.com'",
+      "impact": "Valid URIs with uppercase schemes are rejected with 'Invalid URI scheme' error, even though HTTP RFCs treat scheme as case-insensitive",
+      "location": {
+        "file": "src/mcp_connect/utils/uri_validation.py",
+        "line": 28
+      },
+      "recommendation": "Add .lower() to uri before scheme checks: uri_lower = uri.lower(); has_valid_scheme = any(uri_lower.startswith(scheme) for scheme in VALID_SCHEMES)",
+      "source": ["edge-case"],
+      "triage": "patch"
+    },
+    {
+      "id": "CR-005",
+      "severity": "major",
+      "problem": "Type coercion of non-string uri to str() may hide underlying type issues - str(None) becomes 'None' string, str([]) becomes '[]'",
+      "impact": "Type errors are masked - str(None) becomes 'None' string which fails validation with 'Invalid URI scheme' instead of indicating a missing/null parameter. Confusing error messages for users passing wrong types.",
+      "location": {
+        "file": "src/mcp_connect/client/methods.py",
+        "line": 94
+      },
+      "recommendation": "Check type before str() cast: if not isinstance(clean_arguments['uri'], str): raise HTTPException(status_code=400, detail={'error': 'uri parameter must be a string'})",
+      "source": ["edge-case"],
+      "triage": "patch"
+    },
+    {
+      "id": "CR-006",
+      "severity": "major",
+      "problem": "Validation only runs if 'uri' key exists in clean_arguments - missing uri parameter is not caught client-side",
+      "impact": "convert_to_markdown called without required uri parameter fails with downstream markitdown-mcp server error instead of clear client-side validation. Should fail fast with clear message.",
+      "location": {
+        "file": "src/mcp_connect/client/methods.py",
+        "line": 93
+      },
+      "recommendation": "Check for uri presence explicitly: if name == 'convert_to_markdown': if 'uri' not in clean_arguments: raise HTTPException(400, detail='convert_to_markdown requires uri parameter'); validate_uri(str(clean_arguments['uri']))",
+      "source": ["edge-case"],
+      "triage": "patch"
+    },
+    {
+      "id": "CR-007",
+      "severity": "major",
+      "problem": "Strip on content_after_scheme can hide malformed URIs with only whitespace like 'http://   '",
+      "impact": "Malformed whitespace-only URIs pass validation and get sent to markitdown-mcp, which may fail with obscure downstream errors instead of clear validation rejection",
+      "location": {
+        "file": "src/mcp_connect/utils/uri_validation.py",
+        "line": 35
+      },
+      "recommendation": "Check before strip: if not uri[len(scheme):] or not uri[len(scheme):].strip() - to distinguish between truly empty vs whitespace-only",
+      "source": ["edge-case"],
+      "triage": "patch"
+    }
+  ]
+}
