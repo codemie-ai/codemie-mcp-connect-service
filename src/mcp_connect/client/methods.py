@@ -87,7 +87,6 @@ async def invoke_mcp_method(
         name = _require_param(payload, "name")
         arguments = _optional_mapping_param(payload, "arguments")
         clean_arguments = _strip_none_values(arguments)
-
         logger.debug(
             "Stripped %d null argument(s) for tool %s",
             len(arguments) - len(clean_arguments),

@@ -301,9 +301,6 @@ COPY --from=app-builder /codemie/codemie-mcp-connect/src ./src
 COPY --from=app-builder /codemie/codemie-mcp-connect/scripts ./scripts
 COPY --chown=codemie:codemie pyproject.toml poetry.lock README.md ./
 
-# Install markitdown-mcp MCP server into the application's venv
-RUN /codemie/codemie-mcp-connect/.venv/bin/pip install --no-cache-dir markitdown-mcp==0.0.1a4
-
 # Copy helper scripts and add to PATH (owned by root, executable by all)
 # Using --chown=root:root ensures codemie user cannot modify/delete these scripts
 COPY --chown=root:root --chmod=755 create_python_venv.sh /usr/local/bin/create_python_venv.sh
