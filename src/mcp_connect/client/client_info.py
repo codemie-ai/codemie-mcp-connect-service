@@ -29,3 +29,14 @@ def get_client_info() -> Implementation:
     """Return the Implementation identity sent to MCP servers during session init."""
     name = os.getenv("MCP_CLIENT_NAME", "mcp-bridge")
     return Implementation(name=name, version="1.0.0")
+
+
+def apply_user_agent_header(headers: dict[str, str] | None) -> dict[str, str]:
+    """Return a new headers dict with User-Agent set from MCP_CLIENT_NAME.
+
+    Any existing header matching "user-agent" case-insensitively is removed
+    first so the env-var-derived value always wins with no duplicate key.
+    """
+    merged = {key: value for key, value in (headers or {}).items() if key.lower() != "user-agent"}
+    merged["User-Agent"] = get_client_info().name
+    return merged

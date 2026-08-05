@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "runner": "poetry",
+  "gates": [
+    {"id": "format", "command": "source .venv/bin/activate && poetry run ruff format", "available": true, "source": "guide"},
+    {"id": "lint", "command": "source .venv/bin/activate && poetry run ruff check src/ tests/", "available": true, "source": "guide"},
+    {"id": "typecheck", "command": "source .venv/bin/activate && poetry run mypy src/", "available": true, "source": "guide"},
+    {"id": "black", "command": "source .venv/bin/activate && poetry run black --check src/ tests/", "available": true, "source": "guide"},
+    {"id": "unit", "command": "source .venv/bin/activate && poetry run pytest tests/ --cov=src --cov-report=term-missing", "available": true, "source": "guide"},
+    {"id": "integration", "command": "source .venv/bin/activate && poetry run pytest tests/ -m integration --cov=src --cov-report=term-missing", "available": true, "source": "guide"},
+    {"id": "secrets", "command": "make gitleaks", "available": true, "source": "guide"},
+    {"id": "ui", "command": null, "available": false, "source": "guide"}
+  ],
+  "ui_globs": ["\\.(tsx|jsx|css|html|vue|svelte)$", "src/(ui|frontend|components)/"],
+  "detected_at": "2026-08-05T13:40:00Z"
+}

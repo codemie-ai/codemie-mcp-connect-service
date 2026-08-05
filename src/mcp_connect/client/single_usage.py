@@ -33,7 +33,7 @@ from mcp.client.stdio import stdio_client
 from ..models.request import BridgeRequestBody
 from ..utils import apply_substitutions, mask_dict_values, mask_sensitive_headers
 from ..utils.logger import get_logger
-from .client_info import get_client_info
+from .client_info import apply_user_agent_header, get_client_info
 
 # Reuse the shared transport context manager to avoid duplication
 from .transports import get_transport_ctx
@@ -201,7 +201,7 @@ async def _execute_http_request(
     timeout_sec: float,
 ) -> Any:
     """Execute single-usage HTTP request using simple SDK pattern."""
-    headers = request.mcp_headers or {}
+    headers = apply_user_agent_header(request.mcp_headers)
     logger.debug("Single-usage HTTP: headers=%s", mask_sensitive_headers(headers))
 
     try:
@@ -268,7 +268,7 @@ async def _execute_sse_request(
     """Execute single-usage SSE request using simple SDK pattern."""
     logger.warning("SSE transport is deprecated. Please migrate to Streamable HTTP.")
 
-    headers = request.mcp_headers or {}
+    headers = apply_user_agent_header(request.mcp_headers)
     logger.debug("Single-usage SSE: headers=%s", mask_sensitive_headers(headers))
 
     try:

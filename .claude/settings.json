@@ -4,8 +4,7 @@
     "pr": ""
   },
   "enabledPlugins": {
-    "superpowers@superpowers-dev": true,
-    "superpowers@claude-plugins-official": true,
-    "sdlc-factory@sdlc-factory": true
+    "sdlc-factory@sdlc-factory": true,
+    "superpowers@superpowers-marketplace": true
   }
 }

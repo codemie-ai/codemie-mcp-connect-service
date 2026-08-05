@@ -1,0 +1,2 @@
+{"gate_id":"code-review.final","mode":"hitl","prior_orchestrator_verdict_path":"code-review-final.json","prior_context":{"question":"Approve or request changes on the User-Agent header implementation?","phase":5,"risk_flags":["test-coverage"]}}
+{"gate_id":"code-review.check","mode":"hitl","verdict":{"decision":"approve","confidence":"high"},"prior_orchestrator_verdict_path":"code-review-check.json","escalated":false}

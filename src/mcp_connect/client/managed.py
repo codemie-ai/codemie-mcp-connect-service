@@ -27,11 +27,12 @@ import os
 from dataclasses import dataclass
 
 from mcp import ClientSession
+from mcp.client.sse import sse_client
 
 from ..models.request import BridgeRequestBody
 from ..utils.logger import get_logger
 from ..utils.masking import mask_sensitive_headers
-from .client_info import get_client_info
+from .client_info import apply_user_agent_header, get_client_info
 
 logger = get_logger(__name__)
 
@@ -267,7 +268,7 @@ class ManagedClient:
     ) -> None:
         """Run Streamable HTTP transport client in dedicated task."""
 
-        headers = request.mcp_headers or {}
+        headers = apply_user_agent_header(request.mcp_headers)
         logger.info("Sending headers to MCP server: %s", mask_sensitive_headers(headers))
 
         logger.debug(f"Starting Streamable HTTP client: {request.serverPath}")
@@ -298,10 +299,8 @@ class ManagedClient:
         ready_future: asyncio.Future[ClientSession],
     ) -> None:
         """Run SSE transport client in dedicated task (deprecated)."""
-        from mcp.client.sse import sse_client
-
         logger.warning("SSE transport is deprecated. Please migrate to Streamable HTTP.")
-        headers = request.mcp_headers or {}
+        headers = apply_user_agent_header(request.mcp_headers)
         logger.info("Sending headers to MCP server: %s", mask_sensitive_headers(headers))
 
         logger.debug(f"Starting SSE client: {request.serverPath}")

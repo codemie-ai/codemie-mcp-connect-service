@@ -1,0 +1,70 @@
+{
+  "task": "Inject MCP_CLIENT_NAME into the User-Agent header of every HTTP-based MCP client request (streamable-http, SSE, and SigV4-signed streamable-http; stdio out of scope).",
+  "generated": "2026-08-05T00:00:00Z",
+  "dimensions": {
+    "component_scope": {
+      "score": 3,
+      "label": "M",
+      "affected": "client_info.py (new apply_user_agent_header helper), ManagedClient (managed.py, 2 call sites: streamable-http + SSE), SingleUsageClient (single_usage.py, 2 call sites: streamable-http/SigV4 + SSE)",
+      "layers": "Client / External-integration layer only"
+    },
+    "requirements_clarity": {
+      "score": 2,
+      "label": "S",
+      "status": "Clear",
+      "gaps": null
+    },
+    "technical_risk": {
+      "score": 2,
+      "label": "S",
+      "risk_factors": "Header-merge logic must avoid duplicate/mismatched-case User-Agent keys across 3 transport variants (streamable-http, SSE, SigV4-signed streamable-http); code-review.final (low confidence, forced by no-spec sdlc-light round) caught a missing test for the SigV4 branch (CR-001, major, request-changes)",
+      "mitigation": "11 unit/integration tests added covering case-insensitive override semantics and all three in-scope transports; missing SigV4 coverage fixed in commit 9b800b7 and verified resolved by code-review.check (approve, high confidence)"
+    },
+    "file_change_estimate": {
+      "score": 2,
+      "label": "S",
+      "modified_files": 3,
+      "modified_file_list": [
+        "src/mcp_connect/client/client_info.py",
+        "src/mcp_connect/client/managed.py",
+        "src/mcp_connect/client/single_usage.py"
+      ],
+      "new_files": 1,
+      "new_file_list": [
+        "tests/test_user_agent_header.py"
+      ],
+      "affected_dirs": [
+        "src/mcp_connect/client",
+        "tests"
+      ]
+    },
+    "dependencies": {
+      "score": 1,
+      "label": "XS",
+      "new_packages": [],
+      "version_changes": []
+    },
+    "affected_layers": {
+      "score": 1,
+      "label": "XS",
+      "layers_changed": [
+        "External"
+      ],
+      "schema_migration": false,
+      "cross_system": true
+    }
+  },
+  "total": 11,
+  "size": "S",
+  "band_range": "10-14",
+  "files_changed": 4,
+  "routing": "writing-plans",
+  "key_reasoning": [
+    { "dimension": "component_scope", "reason": "One new pure helper (apply_user_agent_header) wired into 4 existing call sites across 2 separate client implementations (ManagedClient and SingleUsageClient); touches a shared utility module (client_info.py) used by both — red-flag bump applied (core shared utility touched), but still confined to a single logical layer with a clear, repeated pattern" },
+    { "dimension": "file_change_estimate", "reason": "3 files modified (client_info.py, managed.py, single_usage.py) + 1 new test file, spanning 2 directories (src/mcp_connect/client, tests) — matches S band exactly per diffstat evidence" }
+  ],
+  "red_flags_applied": [
+    "Component Scope bumped from S to M: touches core shared utility (client_info.py, consumed by both ManagedClient and SingleUsageClient)"
+  ],
+  "split_recommendation": null
+}

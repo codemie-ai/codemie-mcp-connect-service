@@ -1,0 +1,37 @@
+{
+  "decision": "request-changes",
+  "rationale": "No-spec round (sdlc-light produces no spec.md, so the acceptance lens had nothing to audit) forces confidence to low regardless of the outcome below. Blind and edge-case lenses both ran cleanly and returned no critical/blocking correctness or security issues in the 4-call-site wiring itself; all 4 tests pass and commit messages comply with git-workflow.md. One real gap survives triage: the ticket explicitly names SigV4-signed streamable-http as an in-scope transport, but no test exercises that path, even though get_transport_ctx forwards the same pre-injected headers dict to the SigV4 transport with no special-casing (traced in technical-analysis.md) and is therefore very likely correct. Of the remaining 9 raw observations (5 blind, 5 edge-case), 4 were deferred as pre-existing/explicitly out-of-plan-scope (EC-1: transports.py's dead headers-fallback bypass, explicitly excluded by the plan's 'keep the diff surgical' constraint and unreachable under all 4 current call sites; EC-2: cached-client staleness, inherent to existing ManagedClient TTL caching, not introduced by this diff; EC-3: non-atomic double os.getenv read, no realistic concurrent-mutation scenario for this service; EC-5: cache-key fragmentation, cosmetic) and 5 were dismissed as already-intentional design decisions documented in plan.md's Global Constraints (reuse get_client_info()'s single env-var read site, no version string in User-Agent by design, env var reused for both Implementation.name and User-Agent, minor helper-call overhead, SSE import relocation already justified by the plan as required for test patchability).",
+  "confidence": "low",
+  "risk_flags": ["test-coverage"],
+  "business_review": [],
+  "standards_review": [
+    {
+      "guide": ".ai-run/guides/standards/git-workflow.md",
+      "check": "commit-message-format",
+      "status": "pass",
+      "notes": "All 4 commits (38c4d25, efcdfd1, 04642fb, ebd6a68) follow the documented 'EPMCDME-XXXX: Action and description' pattern."
+    },
+    {
+      "guide": ".ai-run/guides/standards/code-quality.md",
+      "check": "code-quality",
+      "status": "na",
+      "notes": "Guide file does not exist in this repo — not evaluated, not invented."
+    },
+    {
+      "guide": ".ai-run/guides/development/security-patterns.md",
+      "check": "security",
+      "status": "na",
+      "notes": "Guide file does not exist in this repo — not evaluated, not invented. No concrete security issue was found by either lens that would need reporting independent of the guide."
+    }
+  ],
+  "findings": [
+    {
+      "id": "CR-001",
+      "severity": "major",
+      "triage": "patch",
+      "problem": "The ticket's stated scope explicitly names three transports — streamable-http, SSE, and SigV4-signed streamable-http — but tests/test_user_agent_header.py only covers the first two. No test asserts that the injected User-Agent header actually reaches a SigV4-signed request.",
+      "impact": "The SigV4 path is exercised only by code inspection (get_transport_ctx forwards the same headers dict uniformly regardless of sub-transport), not by an executable regression test. A future refactor of transports.py or streamable_http_sigv4.py could silently drop or reorder header injection for that specific branch with nothing failing.",
+      "recommendation": "Add a test in TestManagedUserAgentHeader and/or TestSingleUsageUserAgentHeader (or a dedicated SigV4 test class) that mocks streamablehttp_client_with_sigv4 / the SigV4 branch of get_transport_ctx and asserts the captured headers dict contains the env-derived User-Agent, mirroring the existing streamable-http/SSE test pattern."
+    }
+  ]
+}
