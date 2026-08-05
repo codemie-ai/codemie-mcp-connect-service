@@ -1,6 +1,15 @@
 # Python Image
 
-Lightweight Python 3.12 runtime with Claude Code and Node.js.
+Standalone Python 3.12 scripting runtime. Its base image is the `FROM` line in
+`images/python/Dockerfile`.
+
+This is a separate additional image. It is not the CodeMie MCP Connect Service — that one is
+built from the `Dockerfile` at the repository root and is the image the Helm chart under
+`deploy-templates/` deploys.
+
+Packages are pinned exactly in `requirements.txt` and installed into `/opt/venv`, created as
+root so it stays read-only for the unprivileged runtime user (`1001:1001`). There is no lock
+file and no test suite; a rebuild is the only verification available.
 
 ## Build
 
@@ -10,23 +19,27 @@ Lightweight Python 3.12 runtime with Claude Code and Node.js.
 docker build -t codemie-python images/python/
 ```
 
-### With simple-deck package (requires GCP credentials)
+### With the simple-deck package
 
 ```bash
-docker build \
-  --secret id=google_credentials,src=${HOME}/.config/gcloud/application_default_credentials.json \
-  --build-arg INSTALL_SIMPLE_DECK=true \
-  -t codemie-python images/python/
+docker build --build-arg INSTALL_SIMPLE_DECK=true -t codemie-python images/python/
 ```
 
-If you don't have GCP credentials locally, create a stub file:
+`simple-deck` installs from PyPI in the same layer as `requirements.txt`. No credentials and no
+extra index are required.
+
+## Build args
+
+| ARG                    | What it controls                                          |
+|------------------------|-----------------------------------------------------------|
+| `INSTALL_SIMPLE_DECK`  | Whether `simple-deck` is installed from PyPI               |
+| `SIMPLE_DECK_VERSION`  | The `simple-deck` version, when the above is `true`        |
+| `PIP_VERSION`          | The pip version the venv is upgraded to                    |
+| `LIBCAIRO2_VERSION`    | libcairo2 apt pin, required by CairoSVG and simple-deck    |
+| `LIBRAQM0_VERSION`     | libraqm0 apt pin, complex text layout for Pillow           |
+
+Defaults are not repeated here; they change with routine version bumps. Read them from the file:
 
 ```bash
-touch ${HOME}/.config/gcloud/application_default_credentials.json
+grep -n '^ARG' images/python/Dockerfile
 ```
-
-## Build Args
-
-| ARG                  | Default      | Description                              |
-|----------------------|--------------|------------------------------------------|
-| `INSTALL_SIMPLE_DECK`| `false`      | Install simple-deck from GCP registry    |

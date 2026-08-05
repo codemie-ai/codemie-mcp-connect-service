@@ -11,7 +11,7 @@
 - Structured JSON logging with sensitive data masking
 - Bearer token authentication
 
-**Evidence**: `README.md`:31-43, `AGENTS.md`:8-36
+**Evidence**: `README.md`:31-43, `AGENTS.md`
 
 ---
 
@@ -30,7 +30,7 @@
 - Structured logging middleware on every request
 - Global exception handler for MCP errors
 
-**Evidence**: `AGENTS.md`:184-190, `src/mcp_connect/server/`
+**Evidence**: `AGENTS.md`, `src/mcp_connect/server/`
 
 ---
 
@@ -50,7 +50,7 @@
 - ✅ SSE (deprecated, backward compatibility)
 - ❌ WebSocket (intentionally not supported)
 
-**Evidence**: `AGENTS.md`:192-195, `src/mcp_connect/client/manager.py`
+**Evidence**: `AGENTS.md`, `src/mcp_connect/client/manager.py`
 
 ---
 
@@ -68,7 +68,7 @@
 
 **Best for**: Repeated operations against the same MCP server
 
-**Evidence**: `AGENTS.md`:197-198, `src/mcp_connect/client/managed.py`
+**Evidence**: `AGENTS.md`, `src/mcp_connect/client/managed.py`
 
 #### SingleUsageClient (`src/mcp_connect/client/single_usage.py`)
 
@@ -81,7 +81,7 @@
 
 **Best for**: One-time operations, batch processing, resource-constrained environments
 
-**Evidence**: `AGENTS.md`:199, `src/mcp_connect/client/single_usage.py`
+**Evidence**: `AGENTS.md`, `src/mcp_connect/client/single_usage.py`
 
 ---
 
@@ -95,7 +95,7 @@
 - Automatic cleanup of expired entries
 - Ping validation before returning cached clients
 
-**Evidence**: `AGENTS.md`:201-204, `src/mcp_connect/client/cache.py`
+**Evidence**: `AGENTS.md`, `src/mcp_connect/client/cache.py`
 
 ---
 
@@ -109,7 +109,7 @@
 - Header substitution support
 - Single-usage mode flag
 
-**Evidence**: `AGENTS.md`:206-209, `src/mcp_connect/models/request.py`
+**Evidence**: `AGENTS.md`, `src/mcp_connect/models/request.py`
 
 ---
 
@@ -121,12 +121,12 @@
 
 | Utility | Purpose | Evidence |
 |---|---|---|
-| `logger.py` | Structured JSON logging | `AGENTS.md`:211-215 |
-| `context.py` | Request context propagation | `AGENTS.md`:211-215 |
-| `masking.py` | Sensitive data masking (tokens, credentials) | `AGENTS.md`:211-215 |
-| `substitution.py` | Environment/header variable substitution | `AGENTS.md`:211-215 |
-| `process.py` | Process stdout/stderr capture | `AGENTS.md`:211-215 |
-| `errors.py` | Custom exception types | `AGENTS.md`:274-276 |
+| `logger.py` | Structured JSON logging | `AGENTS.md` |
+| `context.py` | Request context propagation | `AGENTS.md` |
+| `masking.py` | Sensitive data masking (tokens, credentials) | `AGENTS.md` |
+| `substitution.py` | Environment/header variable substitution | `AGENTS.md` |
+| `process.py` | Process stdout/stderr capture | `AGENTS.md` |
+| `errors.py` | Custom exception types | `AGENTS.md` |
 
 **Evidence**: `src/mcp_connect/utils/`
 
@@ -149,7 +149,7 @@
 10. Logging middleware logs response
 ```
 
-**Evidence**: `AGENTS.md`:224-230
+**Evidence**: `AGENTS.md`
 
 ### Single-Usage Mode
 
@@ -162,7 +162,7 @@
 9-10. Same as caching mode
 ```
 
-**Evidence**: `AGENTS.md`:232-237
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -176,7 +176,7 @@ The MCP client manager detects transport type from request config and instantiat
 | HTTP | `url` field present | `HttpServerParameters` | Remote MCP servers over HTTP/HTTPS |
 | SSE | `url` with SSE headers | `SseServerParameters` | Backward compatibility (deprecated) |
 
-**Evidence**: `AGENTS.md`:217-222, `src/mcp_connect/client/manager.py`
+**Evidence**: `AGENTS.md`, `src/mcp_connect/client/manager.py`
 
 ---
 
@@ -192,7 +192,7 @@ The MCP client manager detects transport type from request config and instantiat
 - Returns structured JSON error response
 - Logs full traceback
 
-**Evidence**: `AGENTS.md`:274-276
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -210,7 +210,7 @@ The MCP client manager detects transport type from request config and instantiat
 - `error` — failures requiring attention
 - `critical` — service-level failures
 
-**Evidence**: `AGENTS.md`:279-282, `src/mcp_connect/utils/logger.py`
+**Evidence**: `AGENTS.md`, `src/mcp_connect/utils/logger.py`
 
 ---
 
@@ -231,7 +231,7 @@ The MCP client manager detects transport type from request config and instantiat
 | `MCP_CONNECT_SSE_READ_TIMEOUT` | SSE transport timeout (ms) | 300000 |
 | `NGROK_AUTHTOKEN` | Ngrok tunnel token | None |
 
-**Evidence**: `AGENTS.md`:240-256, `CLAUDE.md`:86-103
+**Evidence**: `AGENTS.md`, `CLAUDE.md`
 
 ---
 
@@ -274,7 +274,7 @@ All modules may depend on `utils/`, but `utils/` has no internal dependencies (f
 - Uvloop for high-performance event loop
 - `asyncio.create_task()` for concurrent operations
 
-**Evidence**: `AGENTS.md`:368, `AGENTS.md`:269-272
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -289,7 +289,7 @@ All modules may depend on `utils/`, but `utils/` has no internal dependencies (f
 - All new code must have tests
 - Critical paths require 100% coverage
 
-**Evidence**: `AGENTS.md`:310-336, `pyproject.toml`:50-59
+**Evidence**: `AGENTS.md`, `pyproject.toml`:50-59
 
 ---
 

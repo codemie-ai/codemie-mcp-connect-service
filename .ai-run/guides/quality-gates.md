@@ -1,178 +1,142 @@
 # Quality Gates
 
-All quality checks MUST pass (exit code 0) before committing code or creating merge requests.
+**Read first:** [`README.md`](README.md) — the guide index.
+**This file owns:** what each gate proves, how to read its failure, and how to fix it.
+**Owned elsewhere:** which gates a given security fix requires → [`security/README.md`](security/README.md) ·
+tool configuration → `pyproject.toml` · the human contribution checklist → `CONTRIBUTING.md`.
 
-## Comprehensive Pre-Commit Check
+Every command below was executed on 2026-07-31 in this repository and its exit code observed.
+Nothing here is inferred from configuration.
 
-**Run**: 
+## Run them one at a time
+
+Run each gate as its own command. A single `&&`-chained string hides which gate failed, and it is
+shell syntax rather than a command, so anything that runs commands directly cannot execute it.
+The chained form is usable only by a human at a prompt.
+
+`poetry run <tool>` finds the in-project `.venv` by itself. `source .venv/bin/activate` is
+needed only to invoke a tool binary directly, without the `poetry run` prefix.
+
+| # | Gate | Command | Blocking | Observed |
+|---|---|---|---|---|
+| 1 | Lock consistency | `poetry check --lock` | yes | exit 0 |
+| 2 | Format | `poetry run ruff format` | no — it mutates | exit 0, all files already formatted |
+| 3 | Lint | `poetry run ruff check` | yes | exit 0 |
+| 4 | Type check | `poetry run mypy src/` | yes | exit 0, no issues |
+| 5 | Format verify | `poetry run black --check src/ tests/` | yes | exit 0, all files unchanged |
+| 6 | Unit tests | `poetry run pytest tests/ --cov=src --cov-report=term-missing` | yes | exit 0, whole suite green, roughly 90s |
+| 7 | Secret scan | `make gitleaks` | yes | see § Secret scan |
+
+**Pass** is exit 0 on every blocking gate. **Fail** is any non-zero exit — fix and re-run the
+gate that failed, then re-run the rest.
+
+---
+
+## 1. Lock consistency — `poetry check --lock`
+
+Proves `poetry.lock` still matches `pyproject.toml`. Run it after any dependency change, before
+anything else — a stale lock makes every later gate test the wrong dependency set.
+
+It prints deprecation warnings about `[tool.poetry.readme]`, `[tool.poetry.authors]`, and
+`[tool.poetry.scripts]`. These are warnings on stdout with exit 0. They are not failures and are
+not yours to fix inside an unrelated change.
+
+**Fail** → re-run the targeted update for the package you changed. Never `rm poetry.lock`, never
+a full relock. See [`build/dependencies.md`](build/dependencies.md).
+
+## 2–3. Format and lint — `ruff`
+
+`poetry run ruff format` rewrites files, so it proves nothing on its own; it is a fix, not a
+check. To assert formatting without mutating, use `poetry run ruff format --check`.
+
+`poetry run ruff check` lints under the `E`, `F`, `I` rule set at line length 120. Rule selection
+lives in `pyproject.toml` `[tool.ruff]` and is not restated here.
+
+**Fail** → `poetry run ruff check --fix` handles the auto-fixable subset. Read the rest.
+
+## 4. Type check — `poetry run mypy src/`
+
+Strict mode. Every function needs annotations; `warn_return_any` and `disallow_untyped_defs` are
+on. `mcp`, `mcp.*`, and `botocore.*` are exempt from import checking because they ship no stubs —
+that override is in `pyproject.toml` and is the only sanctioned exemption.
+
+**Never skip this one.** There is no CI pipeline in this repository, so a type error that leaves
+your machine is a type error that reaches `main`.
+
+**Fail** → add or correct the annotation. Do not silence it with `# type: ignore` unless you can
+name why the checker is wrong.
+
+## 5. Format verify — `poetry run black --check src/ tests/`
+
+Both `black` and `ruff format` are configured at line length 120 and run against this repository
+without conflict. `--check` reports without writing; `poetry run black src/ tests/` applies.
+
+## 6. Unit tests — `pytest`
+
+Roughly 90 seconds. `addopts = "-m 'not integration'"` in `pyproject.toml` means the
+plain invocation already excludes the integration marker; you do not need to pass `-m` yourself.
+
+**Fail** → fix the code or the test. A test deleted or weakened to make the gate pass has failed
+the gate.
+
+Coverage: all new code carries tests, and critical paths — authentication, client lifecycle, MCP
+protocol calls — carry full coverage. Patterns are in
+[`testing/testing-patterns.md`](testing/testing-patterns.md).
+
+## 7. Secret scan — `make gitleaks`
+
+The `Makefile` target runs gitleaks in a container against the repository root, so it needs a
+container runtime that can reach Docker Hub. The image and tag are in the `Makefile`.
+
+Without one, the locally installed binary scans the same tree: `gitleaks dir --no-banner .` →
+exit 0, no leaks found, verified 2026-07-31. A scan that could not run at all is reported as
+unverified, never as a pass.
+
+**Fail** → a real hit is a compromised credential. Remove it, and have a human rotate it. Deleting
+the line without rotating leaves a live secret in the git history.
+
+---
+
+## Traps — commands that look like gates
+
+Never read a verdict from an exit code produced by one of these. Each was executed to confirm the
+trap is real; the observed value is in the table.
+
+| Command | What actually happens |
+|---|---|
+| `poetry run pytest tests/ -m integration` | **exit 5** — every test deselected, none selected. `tests/integration/` holds only `__init__.py` and no test carries `@pytest.mark.integration`. Integration coverage is absent, not passing. |
+| `poetry run pip-licenses --allow-only=...` | **exit 1** on `filelock` (Unlicense), a dev dependency. The allow list in `pyproject.toml` `[tool.pip-licenses]` governs shipped dependencies; scope the run before treating a failure as real. |
+| `poetry run pre-commit run --all-files` | No `.pre-commit-config.yaml` exists in the repository. The framework is installed and has nothing to execute. |
+
+The first sits inside the pre-merge chain in `README.md`. That chain cannot pass as written.
+
+---
+
+## Human convenience form
+
+For a single paste at an interactive prompt, chained so it stops at the first failure. This is
+not the gate definition; the table above is:
+
 ```bash
-source .venv/bin/activate && \
+poetry check --lock && \
 poetry run ruff format && \
 poetry run ruff check && \
 poetry run mypy src/ && \
 poetry run black --check src/ tests/ && \
 poetry run pytest tests/ --cov=src --cov-report=term-missing && \
-poetry run pytest tests/ -m integration --cov=src --cov-report=term-missing && \
 make gitleaks
 ```
 
-**Pass**: All commands exit 0
-**Fail**: Any command exits non-zero — fix issues and re-run
-**Source**: `AGENTS.md`:97-105, `CONTRIBUTING.md`:67-74
-
 ---
 
-## Format (ruff format)
+## When to run what
 
-**Run**: `source .venv/bin/activate && poetry run ruff format`
+| Situation | Gates |
+|---|---|
+| Changed `src/` | 2–6 |
+| Changed a dependency version | 1–6, then rebuild and rescan the image — [`security/README.md`](security/README.md) |
+| Changed only `images/python/`, `uv-constraints.txt`, or a `Dockerfile` | None apply. Rebuild and rescan is the only evidence — [`build/README.md`](build/README.md) |
+| About to commit anything | All blocking gates |
 
-**Pass**: Files auto-formatted, exits 0
-**Fail**: Should not fail — ruff format auto-fixes
-**Auto-fix**: Command itself is the fix
-
-**What it does**: Auto-formats Python code per ruff configuration (line length 120, Python 3.12 target)
-**Config**: `pyproject.toml`:77-79
-
----
-
-## Lint (ruff check)
-
-**Run**: `source .venv/bin/activate && poetry run ruff check src/ tests/`
-
-**Pass**: No lint errors, exits 0
-**Fail**: Outputs error list with file:line, exits non-zero
-**Auto-fix**: `poetry run ruff check --fix src/ tests/` (fixes auto-fixable issues)
-
-**What it does**: Lints code for style issues, unused imports, undefined variables, complexity
-**Config**: `pyproject.toml`:77-79 (line length 120, target py312)
-**Evidence**: `AGENTS.md`:79-81, `pyproject.toml`:77-79
-
----
-
-## Type Check (mypy)
-
-**Run**: `source .venv/bin/activate && poetry run mypy src/`
-
-**Pass**: Zero type errors, exits 0
-**Fail**: Outputs type error list, exits non-zero
-**Auto-fix**: Manual — add type hints, fix type mismatches per error messages
-
-**What it does**: Strict type checking — verifies all functions have type hints, all types are consistent
-**Config**: `pyproject.toml`:61-70 (strict mode enabled, zero errors required)
-**Skip if**: Never skip — strict mypy is a hard requirement
-
-**Evidence**: `AGENTS.md`:73-74, `pyproject.toml`:61-70
-
----
-
-## Format Verification (black --check)
-
-**Run**: `source .venv/bin/activate && poetry run black --check src/ tests/`
-
-**Pass**: All files comply with black formatting, exits 0
-**Fail**: Lists files that would be reformatted, exits non-zero
-**Auto-fix**: `poetry run black src/ tests/` (applies black formatting)
-
-**What it does**: Verifies code matches black's formatting standard (line length 120)
-**Config**: `pyproject.toml`:72-75
-**Evidence**: `AGENTS.md`:76-77, `pyproject.toml`:72-75
-
----
-
-## Unit Tests (pytest)
-
-**Run**: `source .venv/bin/activate && poetry run pytest tests/ --cov=src --cov-report=term-missing`
-
-**Pass**: All unit tests pass, coverage meets requirements, exits 0
-**Fail**: Test failures or coverage below threshold — outputs failure details
-**Auto-fix**: Fix failing tests, add tests for uncovered code
-
-**What it does**: Runs unit tests (excludes integration marker), reports coverage with missing lines
-**Config**: `pyproject.toml`:50-59 (asyncio auto mode, integration tests excluded by default)
-**Coverage**: Critical paths require 100% coverage, all new code must be tested
-
-**Evidence**: `AGENTS.md`:69-71, `pyproject.toml`:50-59
-
----
-
-## Integration Tests (pytest -m integration)
-
-**Run**: `source .venv/bin/activate && poetry run pytest tests/ -m integration --cov=src --cov-report=term-missing`
-
-**Pass**: All integration tests pass, exits 0
-**Fail**: Test failures — outputs failure details
-**Auto-fix**: Fix failing tests
-
-**What it does**: Runs tests marked with `@pytest.mark.integration` — tests with external dependencies, network I/O, subprocess execution
-**Config**: `pyproject.toml`:56 (integration marker definition)
-**Organization**: Integration tests in `tests/integration/test_*.py`
-
-**Evidence**: `AGENTS.md`:70, `pyproject.toml`:56-57
-
----
-
-## Secret Scan (gitleaks)
-
-**Run**: `make gitleaks`
-
-**Pass**: No secrets detected, exits 0
-**Fail**: Outputs detected secrets with file:line, exits non-zero
-**Auto-fix**: Remove secrets from code, use environment variables or secret management
-
-**What it does**: Scans repository for accidentally committed secrets (tokens, passwords, API keys)
-**Implementation**: `Makefile`:1-4 (Docker-based gitleaks v8.30.0)
-**Skip if**: Never skip for commits — prevents secret leaks
-
-**Evidence**: `Makefile`:1-4, `AGENTS.md`:104
-
----
-
-## Additional Quality Commands
-
-### Pre-commit Hooks
-
-**Install** (once per environment):
-```bash
-source .venv/bin/activate
-poetry run pre-commit install
-```
-
-**Run manually**:
-```bash
-poetry run pre-commit run --all-files
-```
-
-**What it does**: Runs configured git hooks (format, lint checks) automatically on commit
-**Evidence**: `AGENTS.md`:116-124
-
-### Helper Scripts
-
-**Available via Poetry** (after activating venv):
-- `poetry run format` → runs black
-- `poetry run lint` → runs ruff check  
-- `poetry run typecheck` → runs mypy
-- `poetry run test` → runs pytest
-
-**Source**: `pyproject.toml`:40-44
-**Evidence**: `AGENTS.md`:84-87
-
----
-
-## Validation Workflow
-
-**Before every commit:**
-1. Activate virtual environment: `source .venv/bin/activate`
-2. Run comprehensive pre-commit check (all gates above)
-3. Verify all commands exit 0
-4. Only commit if all checks pass
-
-**Before every MR:**
-1. All commits must have passed quality checks
-2. Run full check one final time on merged main
-3. Verify CI pipeline passes
-
-**Evidence**:
-- `AGENTS.md`:90-115 — comprehensive check is mandatory before commit/PR
-- `CONTRIBUTING.md`:65-76 — quality check required before PR
-- `pyproject.toml`:40-80 — tool configurations and commands
-- `Makefile`:1-4 — gitleaks security scan
+Nothing re-checks this after merge. There is no `.gitlab-ci.yml` and no GitHub workflow in this
+repository; what you run locally is the only verification that happens.

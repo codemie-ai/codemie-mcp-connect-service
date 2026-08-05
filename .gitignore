@@ -46,7 +46,7 @@ temp/
 .eslintcache
 
 # TypeScript cache
-*.tsbuildinfo 
+*.tsbuildinfo
 
 # Python cache
 __pycache__/
@@ -94,3 +94,8 @@ local/*
 .agents/memory/sdlc/daily/
 docs/superpowers/tasks/*/.state.json
 .claude/settings.local.json
+workspace
+
+# The `build/` rule above (Python build output) also matches .ai-run/guides/build/,
+# which is documentation. Keep those tracked.
+!.ai-run/guides/build/

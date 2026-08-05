@@ -4,16 +4,20 @@
 
 ### Directory Structure
 
-```
-tests/
-├── __init__.py           # Test package marker
-├── conftest.py           # Shared fixtures
-├── test_*.py             # Unit tests
-└── integration/          # Integration tests
-    └── test_*.py
+Naming is what matters; derive the current contents rather than trusting a snapshot.
+
+| Path | Holds |
+|---|---|
+| `tests/conftest.py` | Shared fixtures |
+| `tests/test_*.py` | Unit tests — the whole suite today |
+| `tests/fixtures/` | Test support code, not collected as tests |
+| `tests/integration/` | Where a marked integration test would go. Currently empty of tests. |
+
+```bash
+git ls-files 'tests/**'
 ```
 
-**Evidence**: `AGENTS.md`:311-314, `tests/` directory structure
+**Evidence**: `python_files = ["test_*.py"]` in `pyproject.toml` sets the discovery pattern.
 
 ### Test Types
 
@@ -22,7 +26,11 @@ tests/
 | **Unit** | `tests/test_*.py` | Test individual functions/classes in isolation | None (mocked) |
 | **Integration** | `tests/integration/test_*.py` | Test component interactions, external I/O | External systems (subprocess, network) |
 
-**Evidence**: `AGENTS.md`:311-314
+**Unit tests exist; zero integration tests exist.** The integration row describes where such
+a test would go, not what is there — see § Integration Tests Only.
+
+**Evidence**: `poetry run pytest tests/` → all passed (2026-07-31);
+`git ls-files 'tests/integration/**'` → `__init__.py` only.
 
 ---
 
@@ -39,18 +47,24 @@ poetry run pytest
 
 **Config**: `pyproject.toml`:59 (`addopts = "-m 'not integration'"`)
 
-**Evidence**: `AGENTS.md`:326, `pyproject.toml`:59
+**Evidence**: `AGENTS.md`, `pyproject.toml`:59
 
 ### Integration Tests Only
 
 ```bash
-source .venv/bin/activate
-poetry run pytest -m integration
+poetry run pytest tests/ -m integration
 ```
 
-**What runs**: Tests marked with `@pytest.mark.integration`
+**What runs today: nothing.** Verified 2026-07-31 — everything deselected, **exit 5**.
+`tests/integration/` contains only `__init__.py`, and no test in the repository carries
+`@pytest.mark.integration`.
 
-**Evidence**: `AGENTS.md`:329
+This command therefore cannot pass, and any document presenting it as a mandatory gate is wrong.
+Treat integration coverage as absent. The marker and the directory are scaffolding for tests that
+have not been written; once one exists, this command starts working with no other change.
+
+**Evidence**: `pyproject.toml` `[tool.pytest.ini_options]` defines the marker;
+`git ls-files 'tests/integration/**'` and `grep -rn "mark.integration" tests/` show what uses it.
 
 ### All Tests
 
@@ -61,7 +75,7 @@ poetry run pytest -m ""
 
 **What runs**: Both unit and integration tests
 
-**Evidence**: `AGENTS.md`:332
+**Evidence**: `AGENTS.md`
 
 ### With Coverage
 
@@ -72,7 +86,7 @@ poetry run pytest --cov=src --cov-report=term-missing
 
 **Output**: Coverage percentage + line numbers of uncovered code
 
-**Evidence**: `AGENTS.md`:335, `pyproject.toml`:50-59
+**Evidence**: `AGENTS.md`, `pyproject.toml`:50-59
 
 ---
 
@@ -130,7 +144,7 @@ async def test_mcp_server_stdio():
 
 **Why**: Separates fast unit tests from slower integration tests
 
-**Evidence**: `pyproject.toml`:56-57, `AGENTS.md`:312
+**Evidence**: `pyproject.toml`:56-57, `AGENTS.md`
 
 ### Shared Fixtures
 
@@ -145,7 +159,7 @@ def sample_config():
     return {"key": "value"}
 ```
 
-**Evidence**: `AGENTS.md`:314, `tests/conftest.py`
+**Evidence**: `AGENTS.md`, `tests/conftest.py`
 
 ---
 
@@ -156,7 +170,7 @@ def sample_config():
 - **All new code** must have tests
 - **Critical paths** require 100% coverage (authentication, client lifecycle, MCP protocol calls)
 
-**Evidence**: `AGENTS.md`:316-318
+**Evidence**: `AGENTS.md`
 
 ### Running Coverage Reports
 
@@ -173,7 +187,7 @@ open htmlcov/index.html
 
 **Output**: Shows percentage per file + line numbers NOT covered
 
-**Evidence**: `AGENTS.md`:319
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -211,7 +225,7 @@ open htmlcov/index.html
 4. Run quality check suite (see quality-gates.md)
 5. Verify no regressions in related functionality
 
-**Evidence**: `AGENTS.md`:376-381 (features), `AGENTS.md`:384-390 (bugs)
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -268,7 +282,7 @@ poetry run pytest -x
 | Async tests for async code | Matches production execution model | `asyncio_mode = "auto"` |
 | Mark slow tests as integration | Keeps unit test suite fast | `@pytest.mark.integration` |
 
-**Evidence**: `AGENTS.md`:309-336 (testing requirements), software engineering best practices
+**Evidence**: `AGENTS.md` (testing requirements), software engineering best practices
 
 ---
 
@@ -303,6 +317,6 @@ poetry run pytest -vv
 
 ## Next Steps
 
-- Review [Quality Gates](.ai-run/guides/quality-gates.md) for full pre-commit check including tests
-- Review [Development Practices](.ai-run/guides/development/development-practices.md) for TDD workflow
+- Review [Quality Gates](../quality-gates.md) for full pre-commit check including tests
+- Review [Development Practices](../development/development-practices.md) for TDD workflow
 - Check `tests/` directory for existing test examples

@@ -11,11 +11,11 @@
 
 **Why**: Python 3.12+ supports built-in generic syntax — cleaner, no imports needed
 **Config**: `pyproject.toml`:61-70 (strict mode, `disallow_untyped_defs = true`)
-**Evidence**: `AGENTS.md`:264-267
+**Evidence**: `AGENTS.md`
 
 ### Requirements
 
-All functions MUST have type hints (enforced by mypy strict mode). See `AGENTS.md`:267, `pyproject.toml`:66
+All functions MUST have type hints (enforced by mypy strict mode). See `AGENTS.md`, `pyproject.toml`:66
 
 ---
 
@@ -30,12 +30,12 @@ All functions MUST have type hints (enforced by mypy strict mode). See `AGENTS.m
 | `subprocess.run(cmd)` | `await asyncio.create_subprocess_exec(...)` |
 
 **Why**: FastAPI is async — blocking I/O blocks event loop
-**Evidence**: `AGENTS.md`:269-272
+**Evidence**: `AGENTS.md`
 
 ### Key Patterns
 
-- Use `async with` for async context managers — see `AGENTS.md`:270
-- Use `asyncio.create_task()` for concurrent execution — see `AGENTS.md`:271
+- Use `async with` for async context managers — see `AGENTS.md`
+- Use `asyncio.create_task()` for concurrent execution — see `AGENTS.md`
 
 ---
 
@@ -51,15 +51,15 @@ Use domain-specific exceptions from `utils/errors.py`:
 | `raise ValueError("Invalid input")` | `raise ValidationError("...", details=...)` |
 
 **Why**: Typed exceptions enable specific handling, context aids debugging
-**Evidence**: `AGENTS.md`:274-276, `src/mcp_connect/utils/errors.py`
+**Evidence**: `AGENTS.md`, `src/mcp_connect/utils/errors.py`
 
 ### Always Include Context
 
-Include relevant context in error messages (config, state, error details) — see `AGENTS.md`:275
+Include relevant context in error messages (config, state, error details) — see `AGENTS.md`
 
 ### Log Errors
 
-Log with appropriate severity before re-raising — see `AGENTS.md`:276
+Log with appropriate severity before re-raising — see `AGENTS.md`
 
 ---
 
@@ -68,17 +68,17 @@ Log with appropriate severity before re-raising — see `AGENTS.md`:276
 ### Structured JSON Logging
 
 Use `utils/logger.py` for all logging — outputs parseable JSON for log aggregators
-**Evidence**: `AGENTS.md`:279-282
+**Evidence**: `AGENTS.md`
 
 ### Request Context Propagation
 
 Use `utils/context.py` to propagate request context through call stack — enables tracing single request
-**Evidence**: `AGENTS.md`:280
+**Evidence**: `AGENTS.md`
 
 ### Sensitive Data Masking
 
 Use `utils/masking.py` to mask secrets in logs (tokens, passwords, API keys)
-**Evidence**: `AGENTS.md`:281
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -93,7 +93,7 @@ Use `utils/masking.py` to mask secrets in logs (tokens, passwords, API keys)
 3. Review latest API patterns, best practices, examples
 
 **Why**: Ensures latest stable APIs, avoids deprecated patterns
-**Evidence**: `AGENTS.md`:291-307, `CLAUDE.md`:116-120
+**Evidence**: `AGENTS.md`, `CLAUDE.md`
 
 ### Query Examples
 
@@ -104,7 +104,7 @@ Use `utils/masking.py` to mask secrets in logs (tokens, passwords, API keys)
 | Async tests | "fixtures", "markers" |
 | MCP protocol | "clients", "transports", "protocol" |
 
-**Evidence**: `AGENTS.md`:300-305
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -112,7 +112,7 @@ Use `utils/masking.py` to mask secrets in logs (tokens, passwords, API keys)
 
 ### Write Docstrings
 
-For public functions and classes only — see `AGENTS.md`:287
+For public functions and classes only — see `AGENTS.md`
 
 ### Prohibited
 
@@ -122,7 +122,7 @@ For public functions and classes only — see `AGENTS.md`:287
 
 **Allowed**: Update README.md for user-facing changes, inline code docstrings
 **Why**: Token efficiency — maximum information density, minimum verbosity
-**Evidence**: `AGENTS.md`:284-289
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -130,8 +130,8 @@ For public functions and classes only — see `AGENTS.md`:287
 
 | Tool | Command | Config | Evidence |
 |---|---|---|---|
-| **Black** | `poetry run black src/ tests/` | `pyproject.toml`:72-75 (line length 120) | `AGENTS.md`:76-77 |
-| **Ruff** | `poetry run ruff check src/ tests/` | `pyproject.toml`:77-79 (line length 120, py312) | `AGENTS.md`:79-81 |
+| **Black** | `poetry run black src/ tests/` | `pyproject.toml`:72-75 (line length 120) | `AGENTS.md` |
+| **Ruff** | `poetry run ruff check src/ tests/` | `pyproject.toml`:77-79 (line length 120, py312) | `AGENTS.md` |
 
 ---
 
@@ -148,7 +148,7 @@ For public functions and classes only — see `AGENTS.md`:287
 5. Update docs if user-facing
 6. Verify with integration tests
 
-**Evidence**: `AGENTS.md`:375-381
+**Evidence**: `AGENTS.md`
 
 ### Bug Fix Workflow
 
@@ -158,7 +158,7 @@ For public functions and classes only — see `AGENTS.md`:287
 4. Run full quality check
 5. Verify no regressions
 
-**Evidence**: `AGENTS.md`:384-390
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -166,12 +166,12 @@ For public functions and classes only — see `AGENTS.md`:287
 
 | Principle | Description | Evidence |
 |---|---|---|
-| **API Parity** | Maintain exact API contract compatibility | `AGENTS.md`:368 |
-| **Performance** | Latency ≤ 100ms for cached clients | `AGENTS.md`:369 |
-| **Reliability** | Comprehensive error handling + logging | `AGENTS.md`:370 |
-| **Type Safety** | Strict mypy compliance — zero errors | `AGENTS.md`:371 |
-| **Test Coverage** | All critical paths tested | `AGENTS.md`:372 |
-| **Clean Code** | Pass all quality checks before commit | `AGENTS.md`:373 |
+| **API Parity** | Maintain exact API contract compatibility | `AGENTS.md` |
+| **Performance** | Latency ≤ 100ms for cached clients | `AGENTS.md` |
+| **Reliability** | Comprehensive error handling + logging | `AGENTS.md` |
+| **Type Safety** | Strict mypy compliance — zero errors | `AGENTS.md` |
+| **Test Coverage** | All critical paths tested | `AGENTS.md` |
+| **Clean Code** | Pass all quality checks before commit | `AGENTS.md` |
 
 ---
 
@@ -186,7 +186,7 @@ For public functions and classes only — see `AGENTS.md`:287
 | Must be backward compatible | API contract compliance |
 | Performance SLA: ≤ 100ms | Profile changes, monitor cache hit rate |
 
-**Evidence**: `AGENTS.md`:357
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -200,7 +200,7 @@ For public functions and classes only — see `AGENTS.md`:287
 | Verbose commit messages | `EPMCDME-xxx: Action and description` (< 72 chars) |
 | Redundant documentation | Single source of truth |
 
-**Evidence**: `AGENTS.md`:358
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -242,7 +242,7 @@ async def bridge(request: MCPRequest, client: MCPClient = Depends(get_client)):
 
 ## Next Steps
 
-- [Quality Gates](.ai-run/guides/quality-gates.md) — full pre-commit checklist
-- [Testing](.ai-run/guides/testing/testing-patterns.md) — TDD workflow
-- [Architecture](.ai-run/guides/architecture/architecture.md) — system design
+- [Quality Gates](../quality-gates.md) — full pre-commit checklist
+- [Testing](../testing/testing-patterns.md) — TDD workflow
+- [Architecture](../architecture/architecture.md) — system design
 - `src/mcp_connect/` — implementation examples

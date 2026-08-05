@@ -8,30 +8,37 @@
 | Poetry | 2.1.3 | Dependency management |
 | Virtual environment | — | Isolated Python environment (MANDATORY) |
 
-**Evidence**: `pyproject.toml`:14, `AGENTS.md`:42-54
+**Evidence**: `pyproject.toml`:14, `AGENTS.md`
 
 ---
 
-## Critical: Virtual Environment Activation
+## Virtual Environment
 
-**⚠️ MANDATORY: Always activate the virtual environment BEFORE running ANY Python or Poetry commands!**
+Poetry is configured to keep the environment in-project at `.venv/`, and **`poetry run <tool>`
+resolves it without activation.** Verified 2026-07-31: `poetry run ruff check` from a clean shell
+with no activation → exit 0, and `poetry env info --path` reports the in-project `.venv`.
 
 ```bash
-# Activate virtual environment (REQUIRED for all Python/Poetry commands)
+# Works from a clean shell — no activation needed
+poetry run pytest tests/
+poetry run mypy src/
+
+# Activation is needed only to invoke a tool binary directly, with no `poetry run` prefix
 source .venv/bin/activate
+pytest tests/
 ```
 
-**Why**: Ensures correct Python version, isolated dependencies, prevents system Python conflicts
+`source .venv/bin/activate && <cmd>` is shell syntax, not a command, so anything that runs
+commands without a shell cannot execute it. Prefer the `poetry run` form everywhere.
 
-**Verify activation**:
+**Verify the environment**:
 ```bash
-which python   # Should point to .venv/bin/python
-which poetry   # Should point to .venv/bin/poetry
+poetry env info --path        # should end in /.venv inside this repository
+poetry run python --version   # Python 3.12.x
 ```
 
-**NEVER run Poetry or Python commands without activating .venv first!**
-
-**Evidence**: `AGENTS.md`:42-54, `CLAUDE.md`:18-22, `GEMINI.md`:23-30
+**Evidence**: executed in this repository on 2026-07-31; `poetry install` created `.venv/` and
+`poetry run` located it with no activation.
 
 ---
 
@@ -60,7 +67,7 @@ poetry install
 
 **What it does**: Installs all production and development dependencies from `poetry.lock`
 
-**Evidence**: `AGENTS.md`:63, `README.md`:147-149
+**Evidence**: `AGENTS.md`, `README.md`:147-149
 
 ---
 
@@ -68,21 +75,17 @@ poetry install
 
 ### Directory Structure
 
-```
-/
-├── src/mcp_connect/          # Main Python package
-├── tests/                    # pytest test suite
-├── docs/                     # Project documentation
-├── scripts/                  # Helper scripts
-├── deploy-templates/         # Deployment configs
-├── pyproject.toml            # Poetry config + tool settings
-├── poetry.lock               # Dependency lockfile
-├── Dockerfile                # Container image
-├── .env.example              # Environment template
-└── README.md                 # User documentation
+Derive it; do not read it from a document.
+
+```bash
+# Top-level areas
+git ls-files | awk -F/ 'NF>1{print $1"/"}' | sort -u
+
+# The Python package
+git ls-files 'src/**/*.py'
 ```
 
-**Evidence**: `AGENTS.md`:128-178
+**Evidence**: both commands run against the tracked file list, so they cannot go stale.
 
 ### Configuration Files
 
@@ -93,7 +96,7 @@ poetry install
 | `.env.example` | Environment variable template |
 | `Makefile` | Gitleaks security scan |
 
-**Evidence**: `AGENTS.md`:171-177
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -111,7 +114,7 @@ poetry run uvicorn mcp_connect.main:app --reload
 
 **Default**: http://localhost:8000 (or port from `PORT` env var)
 
-**Evidence**: `AGENTS.md`:66, `CONTRIBUTING.md`:57-62
+**Evidence**: `AGENTS.md`, `CONTRIBUTING.md`:57-62
 
 ### With Environment Variables
 
@@ -130,7 +133,7 @@ LOG_LEVEL=INFO                      # debug|info|warning|error|critical
 LOG_FORMAT=json                     # json|text
 ```
 
-**Evidence**: `CLAUDE.md`:86-103
+**Evidence**: `CLAUDE.md`
 
 ---
 
@@ -147,7 +150,7 @@ LOG_FORMAT=json                     # json|text
 
 **Source**: `pyproject.toml`:40-44
 
-**Evidence**: `AGENTS.md`:84-87
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -167,7 +170,7 @@ poetry run pre-commit install
 poetry run pre-commit run --all-files
 ```
 
-**Evidence**: `AGENTS.md`:116-124
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -199,17 +202,15 @@ source .venv/bin/activate
 # Unit tests only (default)
 poetry run pytest
 
-# Integration tests only
-poetry run pytest -m integration
-
-# All tests
-poetry run pytest -m ""
+# Integration tests: none exist — this collects nothing and exits 5.
+# See testing/testing-patterns.md § Integration Tests Only.
+poetry run pytest tests/ -m integration
 
 # With coverage report
 poetry run pytest --cov=src --cov-report=term-missing
 ```
 
-**Evidence**: `AGENTS.md`:69-71, `AGENTS.md`:322-336
+**Evidence**: `AGENTS.md`
 
 ### Type Checking
 
@@ -220,7 +221,7 @@ poetry run mypy src/
 
 **Must have zero errors** (strict mode enabled)
 
-**Evidence**: `AGENTS.md`:73-74
+**Evidence**: `AGENTS.md`
 
 ### Code Formatting
 
@@ -234,7 +235,7 @@ poetry run black src/ tests/
 poetry run ruff format
 ```
 
-**Evidence**: `AGENTS.md`:76-81
+**Evidence**: `AGENTS.md`
 
 ### Linting
 
@@ -248,7 +249,7 @@ poetry run ruff check src/ tests/
 poetry run ruff check --fix src/ tests/
 ```
 
-**Evidence**: `AGENTS.md`:79-81
+**Evidence**: `AGENTS.md`
 
 ---
 
@@ -280,7 +281,7 @@ poetry run ruff check --fix src/ tests/
 |---|---|---|
 | `NGROK_AUTHTOKEN` | None | Ngrok tunnel authentication token (Docker deployment) |
 
-**Evidence**: `AGENTS.md`:240-256, `CLAUDE.md`:86-103
+**Evidence**: `AGENTS.md`, `CLAUDE.md`
 
 ---
 
@@ -290,9 +291,9 @@ poetry run ruff check --fix src/ tests/
 
 | Issue | Solution |
 |---|---|
-| `poetry: command not found` | Activate venv: `source .venv/bin/activate` |
+| `poetry: command not found` | Poetry is not installed on PATH — install it, or activate `.venv` if it was installed there |
 | `ModuleNotFoundError` | Activate venv, then `poetry install` |
-| Poetry installs to wrong location | Verify: `which poetry` should point to `.venv/bin/poetry` |
+| Poetry uses the wrong environment | `poetry env info --path` must end in `/.venv` inside this repository |
 | Python version mismatch | Recreate venv with Python 3.12+: `python3.12 -m venv .venv` |
 
 ### Dependency Issues
@@ -311,14 +312,14 @@ poetry run ruff check --fix src/ tests/
 | Auth failures | Set `ACCESS_TOKEN` env var or leave unset to disable auth |
 | Import errors | Verify venv activated and `poetry install` completed |
 
-**Evidence**: `AGENTS.md`:42-54 (venv activation), `AGENTS.md`:63 (poetry install)
+**Evidence**: `AGENTS.md`
 
 ---
 
 ## Next Steps
 
 After setup:
-1. Review [Architecture](.ai-run/guides/architecture/architecture.md) to understand system design
-2. Review [Quality Gates](.ai-run/guides/quality-gates.md) before making changes
-3. Review [Git Workflow](.ai-run/guides/standards/git-workflow.md) before committing
-4. Review [Testing](.ai-run/guides/testing/testing-patterns.md) before writing tests
+1. Review [Architecture](architecture/architecture.md) to understand system design
+2. Review [Quality Gates](quality-gates.md) before making changes
+3. Review [Git Workflow](standards/git-workflow.md) before committing
+4. Review [Testing](testing/testing-patterns.md) before writing tests
