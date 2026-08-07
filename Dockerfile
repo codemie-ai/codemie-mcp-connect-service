@@ -258,7 +258,10 @@ COPY src/ ./src/
 
 # Install the package itself now that source code is available
 RUN --mount=type=cache,target=/root/.cache/pypoetry \
-    poetry install --only-root --no-interaction
+    poetry install --only-root --no-interaction \
+    && rm -rf /codemie/codemie-mcp-connect/.venv/lib/python3.12/site-packages/pip \
+              /codemie/codemie-mcp-connect/.venv/lib/python3.12/site-packages/pip-*.dist-info \
+              /codemie/codemie-mcp-connect/.venv/bin/pip*
 
 # ==============================================================================
 # Stage 5: Runtime - Final Production Image (with optional ngrok)
