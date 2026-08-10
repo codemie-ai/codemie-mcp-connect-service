@@ -138,11 +138,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
 RUN npm install -g npm@latest
 
 # Security: upgrade brace-expansion inside npm's own bundled node_modules
-# to 5.0.8 (CVE-2026-14257 — npm 12.x bundles brace-expansion@5.0.7 internally)
+# to 5.0.9 (CVE-2026-14257 — npm 12.x bundles brace-expansion@5.0.7 internally)
 # npm install --prefix fails for npm's own tree; use pack+extract instead
+# Security (EPMCDME-13890): pin >=5.0.9 to fix CVE-2026-69152 (GHSA-rgw5-rvv9-x895 bypasses the prior 5.0.8 cap)
 RUN mkdir -p /tmp/be-fix && \
-    npm pack brace-expansion@5.0.8 --pack-destination /tmp/be-fix 2>/dev/null && \
-    tar -xzf /tmp/be-fix/brace-expansion-5.0.8.tgz --strip-components=1 \
+    npm pack brace-expansion@5.0.9 --pack-destination /tmp/be-fix 2>/dev/null && \
+    tar -xzf /tmp/be-fix/brace-expansion-5.0.9.tgz --strip-components=1 \
         -C /usr/lib/node_modules/npm/node_modules/brace-expansion/ && \
     rm -rf /tmp/be-fix
 
@@ -199,9 +200,10 @@ RUN git clone --depth 1 --recursive https://github.com/modelcontextprotocol/serv
 WORKDIR /codemie/servers
 RUN rm -rf src/everything
 
-# Security: pin brace-expansion >=5.0.8 to fix CVE-2026-14257 (ReDoS in brace-expansion 5.0.7)
+# Security: pin brace-expansion >=5.0.9 to fix CVE-2026-14257 (ReDoS in brace-expansion 5.0.7)
 # and fast-uri >=3.1.4 (CVE-2026-16221) tree-wide
-RUN npm pkg set 'overrides.brace-expansion'='>=5.0.8' 'overrides.fast-uri'='>=3.1.4' && \
+# Security (EPMCDME-13890): pin >=5.0.9 to fix CVE-2026-69152 (GHSA-rgw5-rvv9-x895 bypasses the prior 5.0.8 cap)
+RUN npm pkg set 'overrides.brace-expansion'='>=5.0.9' 'overrides.fast-uri'='>=3.1.4' && \
     rm -f package-lock.json
 
 RUN --mount=type=cache,target=/root/.npm \
