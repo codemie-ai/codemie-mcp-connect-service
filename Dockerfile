@@ -119,13 +119,6 @@ RUN apt-get update && apt-get upgrade -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Security (EPMCDME-13787): remediate CVE-2025-59375, CVE-2026-25210, CVE-2026-45186, CVE-2026-56131, CVE-2026-56408 (libexpat1@2.7.1-2)
-# hadolint ignore=DL3008
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends libexpat1=2.8.2-1~deb13u1 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
 # Install Node.js LTS (for Node.js-based MCP servers)
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # hadolint ignore=DL3008
