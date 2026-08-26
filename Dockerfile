@@ -81,9 +81,14 @@ ARG TARGETARCH
 USER root
 
 # Install comprehensive system dependencies
+# Security (EPMCDME-14396): pin libssl3t64/openssl/openssl-provider-legacy >=3.5.7-1~deb13u2
+# to fix CVE-2026-14456
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
+        libssl3t64=3.5.7-1~deb13u2 \
+        openssl=3.5.7-1~deb13u2 \
+        openssl-provider-legacy=3.5.7-1~deb13u2 \
         # Core utilities
         wget \
         curl \

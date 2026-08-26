@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM dhi.io/python:3.12.13-debian13-dev
+FROM dhi.io/python:3.12.14-debian13-dev
 
 ARG LIBCAIRO2_VERSION=1.18.4-1+b1
 ARG LIBRAQM0_VERSION=0.10.2-1
