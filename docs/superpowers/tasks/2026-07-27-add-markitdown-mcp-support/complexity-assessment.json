@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "task": "Add support for markitdown-mcp to codemie-mcp-connect-service",
+  "generated": "2026-07-27T00:00:00Z",
+  "dimensions": {
+    "component_scope": {
+      "score": 1,
+      "label": "XS"
+    },
+    "requirements_clarity": {
+      "score": 1,
+      "label": "XS"
+    },
+    "technical_risk": {
+      "score": 2,
+      "label": "S"
+    },
+    "file_change_estimate": {
+      "score": 2,
+      "label": "S"
+    },
+    "dependencies": {
+      "score": 3,
+      "label": "M"
+    },
+    "affected_layers": {
+      "score": 1,
+      "label": "XS"
+    }
+  },
+  "total": 10,
+  "size": "S",
+  "routing": "writing-plans",
+  "key_reasoning": [
+    {
+      "dimension": "dependencies",
+      "reason": "New npm package @nomyx-io/markitdown-mcp required, but follows established MCP server installation pattern (identical to github-mcp, fetch-mcp, postgres-typescript, puppeteer-typescript)"
+    },
+    {
+      "dimension": "technical_risk",
+      "reason": "Well-established pattern with exact precedent in 4 existing MCP servers. Minor security considerations for URI validation (file:, data: schemes) addressed by existing transport layer. Potential branch collision with EPMCDME-7134-add-markitdown-mcp-support"
+    },
+    {
+      "dimension": "file_change_estimate",
+      "reason": "Only 2-3 files: Dockerfile (1 line addition in stage 3), new integration test file (~80-120 lines), optional unit test (~40-60 lines). Zero changes to service code"
+    }
+  ],
+  "red_flags_applied": [],
+  "split_recommendation": null
+}
