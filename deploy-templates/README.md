@@ -24,6 +24,7 @@ A Helm chart for AI/Run MCP Connect service
 | env | list | `[]` | List of extra environment variables to be used by the MCP Connect |
 | extraObjects | list | `[]` | Array of extra Kubernetes manifests to deploy |
 | fullnameOverride | string | `""` |  |
+| hostAliases | list | `[]` | Mapping between IP and hostnames that will be injected as entries in the pod's hosts file |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the MCP Connect |
 | image.repository | string | `""` | Repository to use for the MCP Connect |
 | image.tag | string | `""` | Tag to use for the MCP Connect. Overrides the image tag whose default is the chart appVersion |
