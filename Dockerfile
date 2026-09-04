@@ -22,18 +22,11 @@
 # - Java 11/17/21 (for Java-based MCP servers)
 # - Go-based GitHub MCP Server
 # - All official MCP servers (stdio, HTTP, SSE transports)
-# - Optional ngrok tunnel to expose the HTTP server to the outside world
 #
 # Build: docker build --platform linux/amd64 -t mcp-connect:latest .
-# Run (without ngrok):
+# Run:
 #   docker run -d -p 3000:3000 --name mcp-connect \
 #       -e ACCESS_TOKEN=your-token \
-#       mcp-connect:latest
-#
-# Run (with ngrok):
-#   docker run -d -p 3000:3000 --name mcp-connect \
-#       -e ACCESS_TOKEN=your-token \
-#       -e NGROK_AUTHTOKEN=your-ngrok-token \
 #       mcp-connect:latest
 #
 # ==============================================================================
@@ -264,7 +257,7 @@ RUN --mount=type=cache,target=/root/.cache/pypoetry \
               /codemie/codemie-mcp-connect/.venv/bin/pip*
 
 # ==============================================================================
-# Stage 5: Runtime - Final Production Image (with optional ngrok)
+# Stage 5: Runtime - Final Production Image
 # ==============================================================================
 FROM mcp-servers AS runtime
 
@@ -280,14 +273,8 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
     (rmdir --ignore-fail-on-non-empty /root/.local/bin 2>/dev/null || true) && \
     (rm -rf /root/.local/share/uv 2>/dev/null || true)
 
-# Install ngrok agent via APT (Debian/Bookworm repo)
 # hadolint ignore=DL3008
-RUN curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
-      -o /etc/apt/trusted.gpg.d/ngrok.asc && \
-    echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" \
-      > /etc/apt/sources.list.d/ngrok.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends ngrok && \
+RUN apt-get update && \
     echo "Removing vulnerable packages: linux-libc-dev" && \
     apt-get purge -y linux-libc-dev && \
     apt-get clean && \
@@ -318,8 +305,8 @@ COPY --chown=root:root --chmod=755 run_in_python_venv.sh /usr/local/bin/run_in_p
 # Copy uv constraint file to pin mcp SDK for uvx-run tools (e.g. mcp-server-fetch)
 COPY --chown=root:root --chmod=644 uv-constraints.txt /etc/uv-constraints.txt
 
-# Copy startup script that runs Uvicorn + optional ngrok (owned by root)
-COPY --chown=root:root --chmod=755 start-with-ngrok.sh /usr/local/bin/start-with-ngrok.sh
+# Copy startup script that runs Uvicorn (owned by root)
+COPY --chown=root:root --chmod=755 start.sh /usr/local/bin/start.sh
 
 # Set permissions for codemie user
 RUN chmod -R o+rX /codemie /usr/lib/jvm "${MAVEN_HOME}" /codemie/additional-tools && \
@@ -342,11 +329,6 @@ ENV UV_CONSTRAINT=/etc/uv-constraints.txt
 # Default port (can be overridden via PORT environment variable)
 ENV PORT=3000
 
-# Optional reserved ngrok domain, e.g. https://my-app.ngrok.app
-# Note: NGROK_AUTHTOKEN is intentionally NOT given a default here.
-# If you don't provide it at runtime, ngrok is never started.
-ENV NGROK_DOMAIN=""
-
 # Expose port (documentation only)
 EXPOSE ${PORT}
 
@@ -354,5 +336,5 @@ EXPOSE ${PORT}
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Run FastAPI application with Uvicorn + optional ngrok via startup script
-CMD ["start-with-ngrok.sh"]
+# Run FastAPI application with Uvicorn via startup script
+CMD ["start.sh"]

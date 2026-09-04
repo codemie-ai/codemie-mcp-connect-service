@@ -90,7 +90,7 @@ grep -n '^FROM' Dockerfile
 | `base` | The Python base plus apt packages, Node, Maven, and the JDKs |
 | `mcp-servers` | Clones upstream MCP servers and builds the ones under `mcp-servers/` |
 | `app-builder` | Poetry installs the service into a project-local `.venv` |
-| `runtime` | Installs uv and ngrok, creates the unprivileged `codemie` user, copies the venv and source in |
+| `runtime` | Installs uv, creates the unprivileged `codemie` user, copies the venv and source in |
 
 The runtime stage also sets `ENV UV_CONSTRAINT=/etc/uv-constraints.txt`, from the repo-root
 `uv-constraints.txt` it copies in. That file constrains every tool `uvx` installs *at container

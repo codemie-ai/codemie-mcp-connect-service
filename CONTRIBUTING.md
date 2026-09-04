@@ -37,7 +37,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 feat(bridge): add support for streamable-http transport
 fix(cache): handle TTL expiry race condition
-docs(readme): update ngrok tunnel configuration
+docs(readme): update environment variable reference
 ```
 
 ## Pull Request Requirements

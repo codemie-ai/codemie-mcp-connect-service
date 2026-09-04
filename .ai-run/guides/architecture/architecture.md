@@ -229,7 +229,6 @@ The MCP client manager detects transport type from request config and instantiat
 | `MCP_CONNECT_CLIENT_CACHE_TTL` | Cache TTL (ms) | 300000 |
 | `MCP_CONNECT_HTTP_TIMEOUT` | HTTP transport timeout (ms) | 30000 |
 | `MCP_CONNECT_SSE_READ_TIMEOUT` | SSE transport timeout (ms) | 300000 |
-| `NGROK_AUTHTOKEN` | Ngrok tunnel token | None |
 
 **Evidence**: `AGENTS.md`, `CLAUDE.md`
 
@@ -299,6 +298,5 @@ All modules may depend on `utils/`, but `utils/` has no internal dependencies (f
 - Python 3.12+ base image
 - Includes Node.js, OpenJDK, Go runtimes (for MCP servers)
 - Pre-installed MCP servers
-- Optional ngrok tunneling
 
-**Evidence**: `README.md`:75-133, `Dockerfile`
+**Evidence**: `README.md`, `Dockerfile`

@@ -275,12 +275,6 @@ poetry run ruff check --fix src/ tests/
 | `MCP_CONNECT_HTTP_TIMEOUT` | 30000 | HTTP transport timeout (milliseconds) |
 | `MCP_CONNECT_SSE_READ_TIMEOUT` | 300000 | SSE transport read timeout (milliseconds) |
 
-### Optional Settings
-
-| Variable | Default | Description |
-|---|---|---|
-| `NGROK_AUTHTOKEN` | None | Ngrok tunnel authentication token (Docker deployment) |
-
 **Evidence**: `AGENTS.md`, `CLAUDE.md`
 
 ---

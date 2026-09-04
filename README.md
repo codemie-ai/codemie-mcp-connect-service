@@ -28,7 +28,7 @@ CodeMie is an open platform that lets teams build, orchestrate, and scale AI age
 - 🔄 **AI Migration & Modernization** — Migrate and modernize legacy systems and mainframes using AI-powered analysis, code exploration (AICE), and automated transformation workflows.
 - 💼 **AI for Business & Operations** — Deploy AI agents across non-engineering functions such as finance, HR, sales, and support.
 
-**This repository — `codemie-mcp-connect-service` — is the MCP bridge component of the CodeMie platform.** It provides HTTP/HTTPS-to-stdio protocol translation, enabling cloud-based CodeMie AI agents to communicate with locally running MCP servers over any transport (stdio, streamable-http, SSE). Deployed as a Docker container with optional ngrok tunneling for secure public access.
+**This repository — `codemie-mcp-connect-service` — is the MCP bridge component of the CodeMie platform.** It provides HTTP/HTTPS-to-stdio protocol translation, enabling cloud-based CodeMie AI agents to communicate with locally running MCP servers over any transport (stdio, streamable-http, SSE). Deployed as a Docker container.
 
 🌐 **Website:** [codemie.ai](https://codemie.ai)
 📖 **Documentation:** [docs.codemie.ai](https://docs.codemie.ai)
@@ -68,7 +68,6 @@ CodeMie MCP Connect Service solves a critical challenge in the MCP ecosystem: en
 - **Client Caching**: Intelligent connection reuse with 5-minute TTL and ping validation
 - **Single-Usage Mode**: Immediate resource cleanup for one-time operations
 - **Pre-installed MCP Servers**: Comprehensive collection of popular MCP servers ready to use
-- **Built-in Tunneling**: Integrated ngrok support for easy public access
 - **MCP Inspector**: Built-in support for debugging and inspecting MCP servers
 - **Security**: Token-based authentication and controlled access to local resources
 
@@ -82,26 +81,13 @@ docker build --platform linux/amd64 -t codemie-mcp-connect-service .
 
 ### Running the Container
 
-**Without ngrok (local network only):**
+**Basic run:**
 ```bash
 docker run -d --restart unless-stopped --name codemie-mcp-connect-service \
   -e ACCESS_TOKEN=<YourSecretAccessToken> \
   -e PORT=3000 \
   -e LOG_LEVEL=info \
   -e LOG_FORMAT=json \
-  -p 3000:3000 \
-  codemie-mcp-connect-service:latest
-```
-
-**With ngrok tunnel (for cloud platforms like CodeMie):**
-```bash
-docker run -d --restart unless-stopped --name codemie-mcp-connect-service \
-  -e ACCESS_TOKEN=<YourSecretAccessToken> \
-  -e PORT=3000 \
-  -e LOG_LEVEL=info \
-  -e LOG_FORMAT=json \
-  -e NGROK_AUTHTOKEN=<your_ngrok_token_here> \
-  -e NGROK_DOMAIN=<optional_reserved_domain> \
   -p 3000:3000 \
   codemie-mcp-connect-service:latest
 ```
@@ -116,21 +102,6 @@ docker run -d --restart unless-stopped --name codemie-mcp-connect-service \
   -p 59000:59000 \
   codemie-mcp-connect-service:latest
 ```
-
-### Getting the Public URL
-
-After starting the container with ngrok, retrieve the tunnel URL from the container logs:
-
-```bash
-docker logs codemie-mcp-connect-service
-```
-
-Look for output similar to:
-```
-ngrok: url=https://19c8c59a0579.ngrok-free.app
-```
-
-Use this URL as the MCP-Connect URL when configuring MCP Servers in CodeMie.
 
 ### Using markitdown-mcp
 
@@ -295,14 +266,14 @@ For scenarios requiring immediate resource cleanup or one-time operations, use t
 
 ## Exposing Container to CodeMie Platform
 
-To use your locally running container with the CodeMie platform:
+To use your container with the CodeMie platform, it must be reachable from the CodeMie cloud
+service — deploy it behind your own ingress, load balancer, or tunnel of choice.
 
-1. **Start the container** with the ngrok tunnel enabled (as shown above)
-2. **Retrieve the Tunnel URL** from the container logs
-3. **Configure CodeMie Assistants** to use your MCP servers:
+1. **Start the container** and expose it publicly through your chosen ingress/tunnel
+2. **Configure CodeMie Assistants** to use your MCP servers:
    - Navigate to your CodeMie AI Assistant configuration
    - Add a new MCP server connection or modify an existing one
-   - Use the Tunnel URL as MCP-Connect URL
+   - Use your container's public URL as MCP-Connect URL
    - Include your ACCESS_TOKEN in the MCP Server configuration
 
 ```json
@@ -343,7 +314,7 @@ Three critical scripts are installed in `/usr/local/bin/` with root-only write p
 |--------|---------|------------------|
 | `create_python_venv.sh` | Creates Python virtual environments | Root-owned (755) |
 | `run_in_python_venv.sh` | Executes Python in virtual environments | Root-owned (755) |
-| `start-with-ngrok.sh` | Container startup with optional ngrok | Root-owned (755) |
+| `start.sh` | Container startup | Root-owned (755) |
 
 **Security Characteristics:**
 - **Ownership**: `root:root` - only root user can modify or delete
@@ -587,7 +558,7 @@ The container supports the following environment variables:
 |----------|---------|-------------|
 | **Core Configuration** |
 | `ACCESS_TOKEN` | - | Bearer token for API authentication (authentication disabled if not set) |
-| `PORT` | 3000 | HTTP server port (Docker and start-with-ngrok.sh) |
+| `PORT` | 3000 | HTTP server port (Docker and start.sh) |
 | **Logging Configuration** |
 | `LOG_LEVEL` | info | Logging verbosity level: debug, info, warning, error, critical |
 | `LOG_FORMAT` | text | Logging output format: `json` (production, structured) or `text` (development, human-readable) |
@@ -599,9 +570,6 @@ The container supports the following environment variables:
 | `MCP_CONNECT_CACHE_CLEANUP_INTERVAL` | 60000 | Cleanup scheduler interval for removing expired clients in milliseconds (1 minute) |
 | `MCP_CONNECT_HTTP_TIMEOUT` | 30000 | HTTP connection timeout for streamable-http/SSE transports in milliseconds (30 seconds) |
 | `MCP_CONNECT_SSE_READ_TIMEOUT` | 300000 | SSE read timeout for long-polling connections in milliseconds (5 minutes) |
-| **Ngrok Tunnel (Docker Deployment)** |
-| `NGROK_AUTHTOKEN` | - | Ngrok authentication token for public tunnel (start-with-ngrok.sh) |
-| `NGROK_DOMAIN` | - | Optional reserved ngrok domain (e.g., https://my-app.ngrok.app) |
 
 ### Volume Mounts
 
