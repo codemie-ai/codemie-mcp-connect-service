@@ -71,7 +71,7 @@ resources:
     cpu: "100m"
   limits:
     memory: "1Gi"
-    cpu: "500m"
+    cpu: "1"
 
 ## Probes for the MCP Connect
 # Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
