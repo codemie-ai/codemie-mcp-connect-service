@@ -93,7 +93,6 @@ local/*
 .ai-run/runs/
 .agents/memory/sdlc/daily/
 docs/superpowers/tasks/*/.state.json
-docs/superpowers/tasks/*/*.diff
 .claude/settings.local.json
 workspace
 
