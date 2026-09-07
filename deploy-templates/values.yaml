@@ -122,6 +122,9 @@ hostAliases: []
 # -- Runtime class name for MCP Connect pods
 runtimeClassName: ""
 
+# -- Whether to inject service links into pod environment variables
+enableServiceLinks: false
+
 # -- Node selector to be added to the MCP Connect pods
 nodeSelector: {}
 

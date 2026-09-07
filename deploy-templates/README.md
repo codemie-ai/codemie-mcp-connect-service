@@ -21,6 +21,7 @@ A Helm chart for AI/Run MCP Connect service
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | affinity | object | `{}` | Assign affinity rules to the statefulset |
+| enableServiceLinks | bool | `false` | Whether to inject service links into pod environment variables |
 | env | list | `[]` | List of extra environment variables to be used by the MCP Connect |
 | extraObjects | list | `[]` | Array of extra Kubernetes manifests to deploy |
 | fullnameOverride | string | `""` |  |

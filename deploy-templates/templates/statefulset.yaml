@@ -30,6 +30,7 @@ spec:
       {{- if .Values.runtimeClassName }}
       runtimeClassName: {{ .Values.runtimeClassName | quote }}
       {{- end }}
+      enableServiceLinks: {{ .Values.enableServiceLinks }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
