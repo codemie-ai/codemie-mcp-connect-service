@@ -1,0 +1,153 @@
+diff --git a/src/mcp_connect/client/methods.py b/src/mcp_connect/client/methods.py
+index b716f32..0db30ab 100644
+--- a/src/mcp_connect/client/methods.py
++++ b/src/mcp_connect/client/methods.py
+@@ -21,7 +21,8 @@ from typing import Any, Awaitable, Callable
+ 
+ from fastapi import HTTPException
+ from mcp import ClientSession
+-from mcp.types import PaginatedRequestParams
++from mcp.shared.exceptions import McpError
++from mcp.types import CallToolResult, ErrorData, PaginatedRequestParams, TextContent
+ 
+ from ..utils.logger import get_logger
+ from ..utils.masking import REDACTED_VALUE, is_sensitive_key
+@@ -97,7 +98,23 @@ async def invoke_mcp_method(
+             name,
+             _mask_params_recursive(clean_arguments),
+         )
+-        return await session.call_tool(name, clean_arguments)
++        try:
++            return await session.call_tool(name, clean_arguments)
++        except McpError as exc:
++            # EPMCDME-11351: a downstream MCP protocol error (invalid params, unknown
++            # tool, server-side error) previously propagated to a generic HTTP 500.
++            # Surface it as a normal isError tool result so the caller's MCP client can
++            # relay the failure to the model instead of failing the whole request.
++            # Only McpError is caught here — timeouts, connection, and transport/auth
++            # errors must still propagate for the route to map to 503/504/4xx.
++            logger.warning(
++                "tools/call for tool '%s' returned MCP protocol error (code=%s): %s",
++                name,
++                exc.error.code,
++                exc.error.message,
++                extra={"method": method, "mcp_error_code": exc.error.code},
++            )
++            return _mcp_error_to_tool_result(name, exc.error)
+ 
+     if normalized_method == "prompts/list":
+         logger.debug("Calling prompts/list with cursor: %s", payload.get("cursor"))
+@@ -164,6 +181,17 @@ async def invoke_mcp_method(
+     )
+ 
+ 
++def _mcp_error_to_tool_result(name: str, error: ErrorData) -> CallToolResult:
++    """Convert a downstream MCP protocol error into an isError tool result.
++
++    EPMCDME-11351: keeps `/bridge` from returning a generic HTTP 500 when the MCP
++    server rejects a `tools/call` at the protocol layer. Surfaces the error code and
++    message (not `error.data`, which may carry internal detail) to the caller.
++    """
++    text = f"MCP tool '{name}' failed (code {error.code}): {error.message}"
++    return CallToolResult(isError=True, content=[TextContent(type="text", text=text)])
++
++
+ def _ensure_mapping(params: Any, method: str) -> dict[str, Any]:
+     """Ensure params is a mapping for downstream processing."""
+     logger.debug(
+diff --git a/tests/test_main_error_handling.py b/tests/test_main_error_handling.py
+index 9e3f3db..763765f 100644
+--- a/tests/test_main_error_handling.py
++++ b/tests/test_main_error_handling.py
+@@ -206,6 +206,41 @@ async def test_cached_client_detail_includes_error_info_on_downstream_error():
+     assert "url" in body
+ 
+ 
++@pytest.mark.asyncio
++async def test_tools_call_mcp_error_returns_200_iserror_body():
++    """EPMCDME-11351: a downstream MCP protocol error on tools/call yields HTTP 200 with
++    an isError CallToolResult body (not a generic 500), exercised through the real
++    methods.py conversion and routes.py serialization."""
++    from unittest.mock import AsyncMock, MagicMock, patch
++
++    from mcp.shared.exceptions import McpError
++    from mcp.types import INVALID_PARAMS, ErrorData
++
++    session = MagicMock()
++    session.call_tool = AsyncMock(
++        side_effect=McpError(ErrorData(code=INVALID_PARAMS, message="Invalid params: unexpected key 'sql1'"))
++    )
++    managed = MagicMock()
++
++    client = TestClient(app)
++    with patch("src.mcp_connect.server.routes.get_or_create_client", new_callable=AsyncMock) as mock_get:
++        mock_get.return_value = (managed, session)
++
++        response = client.post(
++            "/bridge",
++            json={
++                "serverPath": "npx",
++                "method": "tools/call",
++                "params": {"name": "query", "arguments": {"sql": "SELECT 1"}},
++            },
++        )
++
++    assert response.status_code == 200
++    body = response.json()
++    assert body["isError"] is True
++    assert "Invalid params: unexpected key 'sql1'" in body["content"][0]["text"]
++
++
+ @pytest.mark.asyncio
+ async def test_cleanup_scheduler_error_handling():
+     """Test cleanup scheduler handles errors gracefully."""
+diff --git a/tests/test_mcp_methods.py b/tests/test_mcp_methods.py
+index 724f4e1..848cee5 100644
+--- a/tests/test_mcp_methods.py
++++ b/tests/test_mcp_methods.py
+@@ -20,7 +20,8 @@ from unittest.mock import AsyncMock
+ 
+ import pytest
+ from fastapi import HTTPException
+-from mcp.types import PaginatedRequestParams
++from mcp.shared.exceptions import McpError
++from mcp.types import INVALID_PARAMS, CallToolResult, ErrorData, PaginatedRequestParams
+ 
+ from src.mcp_connect.client.methods import invoke_mcp_method
+ 
+@@ -127,6 +128,35 @@ async def test_tools_call_preserves_falsy_non_none_values(session) -> None:
+     session.call_tool.assert_awaited_once_with("my_tool", {"count": 0, "label": "", "active": False})
+ 
+ 
++@pytest.mark.asyncio
++async def test_tools_call_mcp_error_returns_iserror_result(session) -> None:
++    """EPMCDME-11351: a downstream MCP protocol error must surface as an isError tool
++    result (not propagate to a generic HTTP 500)."""
++    session.call_tool.side_effect = McpError(
++        ErrorData(code=INVALID_PARAMS, message="Invalid params: unexpected key 'sql1'")
++    )
++
++    result = await invoke_mcp_method(session, "tools/call", {"name": "query", "arguments": {"sql": "SELECT 1"}})
++
++    assert isinstance(result, CallToolResult)
++    assert result.isError is True
++    assert len(result.content) == 1
++    text = result.content[0].text
++    assert "query" in text
++    assert "Invalid params: unexpected key 'sql1'" in text
++    assert str(INVALID_PARAMS) in text
++
++
++@pytest.mark.asyncio
++async def test_tools_call_non_mcp_error_propagates(session) -> None:
++    """EPMCDME-11351: only McpError is converted — other failures (timeout, connection,
++    transport/auth) must propagate so the route maps them to 503/504/4xx/500."""
++    session.call_tool.side_effect = ConnectionError("connection refused")
++
++    with pytest.raises(ConnectionError):
++        await invoke_mcp_method(session, "tools/call", {"name": "query", "arguments": {"sql": "SELECT 1"}})
++
++
+ @pytest.mark.asyncio
+ async def test_prompts_list_without_cursor(session) -> None:
+     result = await invoke_mcp_method(session, "prompts/list", None)

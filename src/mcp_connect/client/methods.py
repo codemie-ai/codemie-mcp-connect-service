@@ -21,7 +21,8 @@ from typing import Any, Awaitable, Callable
 
 from fastapi import HTTPException
 from mcp import ClientSession
-from mcp.types import PaginatedRequestParams
+from mcp.shared.exceptions import McpError
+from mcp.types import CallToolResult, ErrorData, PaginatedRequestParams, TextContent
 
 from ..utils.logger import get_logger
 from ..utils.masking import REDACTED_VALUE, is_sensitive_key
@@ -97,7 +98,23 @@ async def invoke_mcp_method(
             name,
             _mask_params_recursive(clean_arguments),
         )
-        return await session.call_tool(name, clean_arguments)
+        try:
+            return await session.call_tool(name, clean_arguments)
+        except McpError as exc:
+            # EPMCDME-11351: a downstream MCP protocol error (invalid params, unknown
+            # tool, server-side error) previously propagated to a generic HTTP 500.
+            # Surface it as a normal isError tool result so the caller's MCP client can
+            # relay the failure to the model instead of failing the whole request.
+            # Only McpError is caught here — timeouts, connection, and transport/auth
+            # errors must still propagate for the route to map to 503/504/4xx.
+            logger.warning(
+                "tools/call for tool '%s' returned MCP protocol error (code=%s): %s",
+                name,
+                exc.error.code,
+                exc.error.message,
+                extra={"method": method, "mcp_error_code": exc.error.code},
+            )
+            return _mcp_error_to_tool_result(name, exc.error)
 
     if normalized_method == "prompts/list":
         logger.debug("Calling prompts/list with cursor: %s", payload.get("cursor"))
@@ -162,6 +179,17 @@ async def invoke_mcp_method(
         status_code=400,
         detail={"error": f"Unsupported method: {method}"},
     )
+
+
+def _mcp_error_to_tool_result(name: str, error: ErrorData) -> CallToolResult:
+    """Convert a downstream MCP protocol error into an isError tool result.
+
+    EPMCDME-11351: keeps `/bridge` from returning a generic HTTP 500 when the MCP
+    server rejects a `tools/call` at the protocol layer. Surfaces the error code and
+    message (not `error.data`, which may carry internal detail) to the caller.
+    """
+    text = f"MCP tool '{name}' failed (code {error.code}): {error.message}"
+    return CallToolResult(isError=True, content=[TextContent(type="text", text=text)])
 
 
 def _ensure_mapping(params: Any, method: str) -> dict[str, Any]:

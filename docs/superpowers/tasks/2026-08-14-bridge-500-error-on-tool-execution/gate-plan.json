@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "runner": "poetry",
+  "source": "guide-first (.ai-run/guides/quality-gates.md)",
+  "gates": [
+    {"id": "lock",         "command": "poetry check --lock",                                  "blocking": true,  "available": true},
+    {"id": "format",       "command": "poetry run ruff format --check",                       "blocking": false, "available": true},
+    {"id": "lint",         "command": "poetry run ruff check",                                "blocking": true,  "available": true},
+    {"id": "typecheck",    "command": "poetry run mypy src/",                                 "blocking": true,  "available": true},
+    {"id": "format-verify","command": "poetry run black --check src/ tests/",                 "blocking": true,  "available": true},
+    {"id": "unit",         "command": "poetry run pytest tests/ --cov=src --cov-report=term-missing", "blocking": true, "available": true},
+    {"id": "secret-scan",  "command": "make gitleaks",                                        "blocking": true,  "available": false}
+  ],
+  "ui_globs": ["\\.(tsx|jsx|css|html|vue|svelte)$", "src/(ui|frontend|components)/"],
+  "detected_at": "2026-08-14"
+}

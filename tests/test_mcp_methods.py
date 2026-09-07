@@ -20,7 +20,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import HTTPException
-from mcp.types import PaginatedRequestParams
+from mcp.shared.exceptions import McpError
+from mcp.types import INVALID_PARAMS, CallToolResult, ErrorData, PaginatedRequestParams
 
 from src.mcp_connect.client.methods import invoke_mcp_method
 
@@ -125,6 +126,35 @@ async def test_tools_call_preserves_falsy_non_none_values(session) -> None:
     )
 
     session.call_tool.assert_awaited_once_with("my_tool", {"count": 0, "label": "", "active": False})
+
+
+@pytest.mark.asyncio
+async def test_tools_call_mcp_error_returns_iserror_result(session) -> None:
+    """EPMCDME-11351: a downstream MCP protocol error must surface as an isError tool
+    result (not propagate to a generic HTTP 500)."""
+    session.call_tool.side_effect = McpError(
+        ErrorData(code=INVALID_PARAMS, message="Invalid params: unexpected key 'sql1'")
+    )
+
+    result = await invoke_mcp_method(session, "tools/call", {"name": "query", "arguments": {"sql": "SELECT 1"}})
+
+    assert isinstance(result, CallToolResult)
+    assert result.isError is True
+    assert len(result.content) == 1
+    text = result.content[0].text
+    assert "query" in text
+    assert "Invalid params: unexpected key 'sql1'" in text
+    assert str(INVALID_PARAMS) in text
+
+
+@pytest.mark.asyncio
+async def test_tools_call_non_mcp_error_propagates(session) -> None:
+    """EPMCDME-11351: only McpError is converted — other failures (timeout, connection,
+    transport/auth) must propagate so the route maps them to 503/504/4xx/500."""
+    session.call_tool.side_effect = ConnectionError("connection refused")
+
+    with pytest.raises(ConnectionError):
+        await invoke_mcp_method(session, "tools/call", {"name": "query", "arguments": {"sql": "SELECT 1"}})
 
 
 @pytest.mark.asyncio

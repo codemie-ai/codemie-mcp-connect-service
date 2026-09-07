@@ -1,0 +1,22 @@
+{
+  "gate_id": "code-review.final",
+  "decision": "approve",
+  "confidence": "high",
+  "risk_flags": [],
+  "rationale": "All three lenses ran on the full diff. The narrow try/except McpError around session.call_tool converts downstream JSON-RPC protocol errors into a 200 isError CallToolResult, resolving the ticket's generic-500 root cause; timeouts/connection/httpx-auth errors (not McpError on the client path) still propagate, and existing 401/403/404/503/504 tests are unaffected. Acceptance audit: all 6 criteria pass. Commit format complies with git-workflow.md; error.data is deliberately withheld while code+message are surfaced (criterion f). The edge-case lens's critical UrlElicitationRequiredError finding was verified as a non-regression: the client-side send_request raises only base McpError (never the subclass), this service uses no elicitation, and the prior behavior was a 500 regardless. Dismissed 4 findings (theoretical exc.error null-safety x2 merged, over-broad-catch, low-confidence httpx-wrap, and the elicitation-subclass concern). Deferred 3 non-blocking hardening ideas (severity-based log level; masking/truncating the downstream error.message before logging and surfacing; response-text length cap) for a follow-up if telemetry shows leaky downstream servers.",
+  "business_review": [
+    {"id": "a", "status": "pass", "note": "Valid tool requests unaffected; only the McpError path changes. e2e + unit tests cover the success/error split."},
+    {"id": "b", "status": "pass", "note": "McpError on tools/call no longer reaches the routes.py catch-all 500; returns 200 isError body."},
+    {"id": "c", "status": "pass", "note": "Structured 200 isError result is parseable by the frontend MCP client instead of an opaque 500."},
+    {"id": "d", "status": "pass", "note": "Protocol failures surface as tool-level errors the model can relay/self-correct on, not request-blocking backend failures."},
+    {"id": "e", "status": "pass", "note": "Root cause documented in plan.md with verified SDK exception paths."},
+    {"id": "f", "status": "pass", "note": "Warning log carries code+message server-side; caller sees code+message only; error.data withheld."}
+  ],
+  "standards_review": [
+    {"standard": "commit-format (git-workflow.md)", "status": "pass", "note": "Commit e656e43 'EPMCDME-11351: Return isError tool result for MCP protocol errors on /bridge' matches EPMCDME-XXXX: imperative format."},
+    {"standard": "error-handling / logging (AGENTS.md, CLAUDE.md)", "status": "pass", "note": "Async preserved; logs via utils/logger; narrow catch matches surrounding error-handling idiom; EPMCDME-11351 plain ticket comment (not a # Security pin), correct for a bugfix."},
+    {"standard": "secret exposure", "status": "pass", "note": "No credentials logged or surfaced; error.data (internal-detail carrier) deliberately excluded."},
+    {"standard": "tests accompany change", "status": "pass", "note": "Unit conversion + non-McpError propagation guard + e2e 200 isError body added; TDD RED->GREEN observed; suite green."}
+  ],
+  "findings": []
+}

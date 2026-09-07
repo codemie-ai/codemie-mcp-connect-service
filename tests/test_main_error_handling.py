@@ -207,6 +207,41 @@ async def test_cached_client_detail_includes_error_info_on_downstream_error():
 
 
 @pytest.mark.asyncio
+async def test_tools_call_mcp_error_returns_200_iserror_body():
+    """EPMCDME-11351: a downstream MCP protocol error on tools/call yields HTTP 200 with
+    an isError CallToolResult body (not a generic 500), exercised through the real
+    methods.py conversion and routes.py serialization."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from mcp.shared.exceptions import McpError
+    from mcp.types import INVALID_PARAMS, ErrorData
+
+    session = MagicMock()
+    session.call_tool = AsyncMock(
+        side_effect=McpError(ErrorData(code=INVALID_PARAMS, message="Invalid params: unexpected key 'sql1'"))
+    )
+    managed = MagicMock()
+
+    client = TestClient(app)
+    with patch("src.mcp_connect.server.routes.get_or_create_client", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = (managed, session)
+
+        response = client.post(
+            "/bridge",
+            json={
+                "serverPath": "npx",
+                "method": "tools/call",
+                "params": {"name": "query", "arguments": {"sql": "SELECT 1"}},
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["isError"] is True
+    assert "Invalid params: unexpected key 'sql1'" in body["content"][0]["text"]
+
+
+@pytest.mark.asyncio
 async def test_cleanup_scheduler_error_handling():
     """Test cleanup scheduler handles errors gracefully."""
     import asyncio
