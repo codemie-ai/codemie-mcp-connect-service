@@ -1,4 +1,4 @@
 # mcp-server-fetch 2026.7.10 imports McpError which was renamed to MCPError in mcp>=2.0.0.
 # Pin mcp to last compatible version until upstream fixes the import.
 # See: https://github.com/modelcontextprotocol/servers/issues (mcp-server-fetch)
-mcp==1.28.1
+mcp==1.30.0
