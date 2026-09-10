@@ -52,6 +52,7 @@ securityContext:
   runAsUser: 1001
   runAsGroup: 1001
   allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
   seccompProfile:
     type: RuntimeDefault
   capabilities:
@@ -69,9 +70,11 @@ resources:
   requests:
     memory: "1Gi"
     cpu: "100m"
+    ephemeral-storage: "2Gi"
   limits:
     memory: "1Gi"
     cpu: "1"
+    ephemeral-storage: "2Gi"
 
 ## Probes for the MCP Connect
 # Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/

@@ -50,9 +50,9 @@ A Helm chart for AI/Run MCP Connect service
 | readinessProbe.successThreshold | int | `1` | Minimum consecutive successes for the probe to be considered successful after having failed |
 | readinessProbe.timeoutSeconds | int | `1` | Number of seconds after which the probe times out |
 | replicaCount | int | `1` | The number of MCP Connect pods to run |
-| resources | object | `{"limits":{"cpu":"1","memory":"1Gi"},"requests":{"cpu":"100m","memory":"1Gi"}}` | Resource limits and requests for the MCP Connect pods |
+| resources | object | `{"limits":{"cpu":"1","ephemeral-storage":"2Gi","memory":"1Gi"},"requests":{"cpu":"100m","ephemeral-storage":"2Gi","memory":"1Gi"}}` | Resource limits and requests for the MCP Connect pods |
 | runtimeClassName | string | `""` | Runtime class name for MCP Connect pods |
-| securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"runAsGroup":1001,"runAsNonRoot":true,"runAsUser":1001,"seccompProfile":{"type":"RuntimeDefault"}}` | MCP Connect container-level security context |
+| securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":1001,"runAsNonRoot":true,"runAsUser":1001,"seccompProfile":{"type":"RuntimeDefault"}}` | MCP Connect container-level security context |
 | service.port | int | `3000` | MCP Connect service port |
 | service.type | string | `"ClusterIP"` | MCP Connect service type |
 | serviceAccount.annotations | object | `{}` | Annotations applied to created service account |

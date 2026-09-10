@@ -187,9 +187,10 @@ FROM base AS mcp-servers
 
 # Install official MCP servers (Node.js-based)
 WORKDIR /codemie
-RUN git clone --depth 1 --recursive https://github.com/modelcontextprotocol/servers.git
+RUN git clone --depth 1 --recursive https://github.com/modelcontextprotocol/servers.git \
+    && rm -rf servers/src/everything
+
 WORKDIR /codemie/servers
-RUN rm -rf src/everything
 
 # Security: pin brace-expansion >=5.0.9 to fix CVE-2026-14257 (ReDoS in brace-expansion 5.0.7)
 # and fast-uri >=3.1.4 (CVE-2026-16221) tree-wide
@@ -206,13 +207,11 @@ COPY mcp-servers ./mcp-servers
 
 # Build postgres-typescript
 WORKDIR /codemie/mcp-servers/postgres-typescript
-RUN rm -f package-lock.json
 RUN --mount=type=cache,target=/root/.npm \
     npm install && npm run build && npm link
 
 # Build puppeteer-typescript
 WORKDIR /codemie/mcp-servers/puppeteer-typescript
-RUN rm -f package-lock.json
 RUN --mount=type=cache,target=/root/.npm \
     npm install && npm run build && npm link
 
@@ -232,6 +231,8 @@ COPY --from=github-mcp-build /bin/github-mcp-server /codemie/additional-tools/gi
 # Stage 4: Python Application Build
 # ==============================================================================
 FROM mcp-servers AS app-builder
+
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # Install Poetry for Python dependency management and configure venv in project directory
 RUN pip install --no-cache-dir poetry==2.2.0 && \
@@ -274,8 +275,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
     (rm -rf /root/.local/share/uv 2>/dev/null || true)
 
 # hadolint ignore=DL3008
-RUN apt-get update && \
-    echo "Removing vulnerable packages: linux-libc-dev" && \
+RUN echo "Removing vulnerable packages: linux-libc-dev" && \
     apt-get purge -y linux-libc-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -289,7 +289,6 @@ WORKDIR /codemie/codemie-mcp-connect
 COPY --from=app-builder /codemie/codemie-mcp-connect/.venv ./.venv
 COPY --from=app-builder /codemie/codemie-mcp-connect/src ./src
 COPY --from=app-builder /codemie/codemie-mcp-connect/scripts ./scripts
-COPY --chown=codemie:codemie pyproject.toml poetry.lock README.md ./
 
 # Copy helper scripts and add to PATH (owned by root, executable by all)
 # Using --chown=root:root ensures codemie user cannot modify/delete these scripts
@@ -302,13 +301,12 @@ COPY --chown=root:root --chmod=644 uv-constraints.txt /etc/uv-constraints.txt
 # Copy startup script that runs Uvicorn (owned by root)
 COPY --chown=root:root --chmod=755 start.sh /usr/local/bin/start.sh
 
-# Set permissions for codemie user
-RUN chmod -R o+rX /codemie /usr/lib/jvm "${MAVEN_HOME}" /codemie/additional-tools && \
-    chmod +x /codemie/additional-tools/github-mcp-server/github-mcp-server && \
-    chown -R codemie:codemie /codemie/codemie-mcp-connect
+# Set permissions for codemie user (application code remains root-owned to prevent runtime modification)
+RUN chmod -R o+rX /codemie /usr/lib/jvm "${MAVEN_HOME}"
 
-# Switch to codemie user
+# Switch to codemie user and set user workspace so MCP tools (Playwright screenshots, artifacts) execute in writable directory
 USER codemie
+WORKDIR /home/codemie
 
 # Set PATH to include:
 # - Python venv binaries
@@ -319,6 +317,9 @@ ENV PATH=/codemie/codemie-mcp-connect/.venv/bin:/usr/local/bin:${MAVEN_HOME}/bin
 
 # Pin mcp SDK for all uvx tool installs (mcp-server-fetch uses McpError removed in mcp>=2.0.0)
 ENV UV_CONSTRAINT=/etc/uv-constraints.txt
+
+# Prevent Python from writing .pyc bytecode files to disk at runtime
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # Default port (can be overridden via PORT environment variable)
 ENV PORT=3000
