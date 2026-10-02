@@ -34,6 +34,9 @@ PyYAML==6.0.2
 # Logging enhancements
 structlog==24.4.0
 
+# Security (EPMCDME-15157): remediate CVE-2026-63374 (anyio@4.11.0) — transitive dependency, pinned explicitly
+anyio==4.14.2
+
 # ====================
 # File Processing Dependencies
 # ====================
