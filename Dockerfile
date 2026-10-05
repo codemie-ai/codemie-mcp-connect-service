@@ -61,6 +61,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # ==============================================================================
 FROM python:3.12-slim AS base
 ARG TARGETARCH
+ARG CHROMIUM_VERSION=154.0.8037.92-1~deb13u1
 
 # hadolint ignore=DL3002
 USER root
@@ -105,8 +106,7 @@ RUN apt-get update && apt-get upgrade -y && \
         libxkbcommon0 \
         libgbm1 \
         libasound2 \
-        chromium \
-        chromium-common && \
+        chromium=${CHROMIUM_VERSION} && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
