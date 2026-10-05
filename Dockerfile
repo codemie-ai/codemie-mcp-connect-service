@@ -35,7 +35,8 @@
 # Stage 1: Build GitHub MCP Server (Go)
 # ==============================================================================
 # Security (EPMCDME-13515): bump to alpine3.24 base to pick up Go 1.25.12, fixing CVE-2026-39822 in stdlib
-FROM dhi.io/golang:1.25-alpine3.24-dev AS github-mcp-build
+# Go 1.26: github-mcp-server latest-release go.mod requires go >= 1.26.8 (GOTOOLCHAIN=local, no auto-download)
+FROM dhi.io/golang:1.26-alpine3.24-dev AS github-mcp-build
 ARG VERSION="dev"
 ARG TARGETARCH
 
@@ -48,21 +49,12 @@ RUN --mount=type=cache,target=/var/cache/apk \
 # Clone and build GitHub MCP Server from specific tag
 RUN git clone --branch latest-release --depth 1 https://github.com/github/github-mcp-server.git .
 
-# TODO: Remove once github-mcp-server ships with golang.org/x/net >= v0.56.0
-# Security (EPMCDME-14103): bump golang.org/x/net to >=0.56.0 to fix CVE-2026-46600 (DNS message parsing panic/DoS in dns/dnsmessage via crafted SVCB/HTTPS resource records)
-# TODO: Remove once github-mcp-server ships with golang.org/x/text >= v0.39.0
-# Security (EPMCDME-13760): pin golang.org/x/text >=0.39.0 to fix CVE-2026-56852 (CWE-835 infinite loop in unicode/utf8 text processing)
-RUN --mount=type=cache,target=/go/pkg/mod \
-    go get golang.org/x/net@v0.56.0 && \
-    go get golang.org/x/text@v0.39.0 && \
-    go mod tidy
-
 # Build with architecture support and optimizations
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOARCH=${TARGETARCH} go build \
     -ldflags="-s -w -X main.version=${VERSION} -X main.commit=$(git rev-parse HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    -o /bin/github-mcp-server cmd/github-mcp-server/main.go
+    -o /bin/github-mcp-server ./cmd/github-mcp-server
 
 # ==============================================================================
 # Stage 2: Base Image - Multi-Runtime Foundation
@@ -75,13 +67,14 @@ USER root
 
 # Install comprehensive system dependencies
 # Security (EPMCDME-14396): pin libssl3t64/openssl/openssl-provider-legacy >=3.5.7-1~deb13u2
-# to fix CVE-2026-14456
+# to fix CVE-2026-14456; bumped to deb13u3 because apt-get upgrade already installs it and an
+# older exact pin fails with "Packages were downgraded"
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
-        libssl3t64=3.5.7-1~deb13u2 \
-        openssl=3.5.7-1~deb13u2 \
-        openssl-provider-legacy=3.5.7-1~deb13u2 \
+        libssl3t64=3.5.7-1~deb13u3 \
+        openssl=3.5.7-1~deb13u3 \
+        openssl-provider-legacy=3.5.7-1~deb13u3 \
         # Core utilities
         wget \
         curl \
