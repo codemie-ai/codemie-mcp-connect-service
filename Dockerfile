@@ -35,8 +35,8 @@
 # Stage 1: Build GitHub MCP Server (Go)
 # ==============================================================================
 # Security (EPMCDME-13515): bump to alpine3.24 base to pick up Go 1.25.12, fixing CVE-2026-39822 in stdlib
-# Go 1.26: github-mcp-server latest-release go.mod requires go >= 1.26.8 (GOTOOLCHAIN=local, no auto-download)
-FROM dhi.io/golang:1.26-alpine3.24-dev AS github-mcp-build
+# Go 1.27: github-mcp-server latest-release go.mod requires go >= 1.27.3 (GOTOOLCHAIN=local, no auto-download)
+FROM dhi.io/golang:1.27-alpine3.24-dev AS github-mcp-build
 ARG VERSION="dev"
 ARG TARGETARCH
 
