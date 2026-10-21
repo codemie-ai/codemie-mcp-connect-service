@@ -212,6 +212,60 @@ def test_header_substitution_in_mcp_headers() -> None:
     assert substituted.mcp_headers == {"Authorization": "Bearer super-secret"}
 
 
+def test_missing_mapped_header_is_dropped() -> None:
+    request = BridgeRequestBody(
+        serverPath="tool",
+        mcp_headers={
+            "Authorization": "Bearer $headers.api_token",
+            "Content-Type": "application/json",
+        },
+        request_headers={},
+        method="ping",
+        params={},
+    )
+
+    substituted = apply_substitutions(request)
+
+    assert substituted.mcp_headers == {"Content-Type": "application/json"}
+
+
+def test_mixed_mapped_headers_drop_only_unresolved_entries() -> None:
+    request = BridgeRequestBody(
+        serverPath="tool",
+        mcp_headers={
+            "Authorization": "Bearer $headers.missing_api_token",
+            "Token": "Token $headers.api_token",
+            "Env-element": "env $VAR",
+            "Mix": "env $VAR and $headers.missing_api_token",
+        },
+        env={"VAR": "value"},
+        request_headers={"api_token": "super-secret"},
+        method="ping",
+        params={},
+    )
+
+    substituted = apply_substitutions(request)
+
+    assert substituted.mcp_headers == {
+        "Token": "Token super-secret",
+        "Env-element": "env value",
+    }
+
+
+def test_empty_valued_mapped_header_is_dropped() -> None:
+    request = BridgeRequestBody(
+        serverPath="tool",
+        mcp_headers={"Authorization": "Bearer $headers.api_token"},
+        request_headers={"api_token": ""},
+        method="ping",
+        params={},
+    )
+
+    substituted = apply_substitutions(request)
+
+    assert substituted.mcp_headers == {}
+
+
 def test_logging_masks_header_values(caplog: pytest.LogCaptureFixture) -> None:
     request = BridgeRequestBody(
         serverPath="https://example.com",

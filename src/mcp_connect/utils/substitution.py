@@ -197,6 +197,16 @@ def _substitute_iterable(
     return substituted_values
 
 
+def _references_missing_header(value: str, request_headers: dict[str, str]) -> bool:
+    headers = request_headers or {}
+    headers_lower = {key.lower(): value for key, value in headers.items()}
+    for match in HEADER_VAR_PATTERN.finditer(value):
+        header_name = match.group(1).lower()
+        if not headers_lower.get(header_name, None):
+            return True
+    return False
+
+
 def _substitute_mapping(
     mapping: dict[str, str],
     env: dict[str, str],
@@ -207,6 +217,9 @@ def _substitute_mapping(
     env_substitutions = 0
     header_substitutions = 0
     for key, value in mapping.items():
+        if _references_missing_header(value, request_headers):
+            logger.debug("Dropping %s entry '%s': referenced header is missing or empty", field_name, key)
+            continue
         has_env = bool(ENV_VAR_PATTERN.search(value))
         has_headers = bool(HEADER_VAR_PATTERN.search(value))
         if has_env or has_headers:
