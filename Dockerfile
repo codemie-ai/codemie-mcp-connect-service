@@ -49,6 +49,11 @@ RUN --mount=type=cache,target=/var/cache/apk \
 # Clone and build GitHub MCP Server from specific tag
 RUN git clone --branch latest-release --depth 1 https://github.com/github/github-mcp-server.git .
 
+# Security (EPMCDME-15803): pin golang.org/x/net v0.60.0 to fix CVE-2026-78669 (GO-2026-6611); installed v0.59.0
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go get golang.org/x/net@v0.60.0 && CGO_ENABLED=0 go mod tidy
+
 # Build with architecture support and optimizations
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
