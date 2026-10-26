@@ -131,11 +131,12 @@ RUN npm install -g npm@latest
 # Security (EPMCDME-13890): pin >=5.0.9 to fix CVE-2026-69152 (GHSA-rgw5-rvv9-x895 bypasses the prior 5.0.8 cap)
 # Security (EPMCDME-15932): bump brace-expansion to 5.0.11 to fix CVE-2026-102276, CVE-2026-102278 (bundled 5.0.9)
 # Security (EPMCDME-15933): pack undici@6.28.1 into npm's bundled tree to fix CVE-2026-19534 (bundled 6.28.0)
+# Security (EPMCDME-16378): bump packed undici to 6.29.1 to fix CVE-2026-109869 (bundled 6.28.1)
 RUN mkdir -p /tmp/be-fix && \
-    npm pack brace-expansion@5.0.11 undici@6.28.1 --pack-destination /tmp/be-fix 2>/dev/null && \
+    npm pack brace-expansion@5.0.11 undici@6.29.1 --pack-destination /tmp/be-fix 2>/dev/null && \
     tar -xzf /tmp/be-fix/brace-expansion-5.0.11.tgz --strip-components=1 \
         -C /usr/lib/node_modules/npm/node_modules/brace-expansion/ && \
-    tar -xzf /tmp/be-fix/undici-6.28.1.tgz --strip-components=1 \
+    tar -xzf /tmp/be-fix/undici-6.29.1.tgz --strip-components=1 \
         -C /usr/lib/node_modules/npm/node_modules/undici/ && \
     rm -rf /tmp/be-fix
 
