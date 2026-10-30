@@ -184,9 +184,14 @@ For scenarios requiring immediate resource cleanup or one-time operations, use t
   "method": "tools/list",
   "args": ["-y", "@upstash/context7-mcp"],
   "params": {},
-  "single_usage": true
+  "single_usage": true,
+  "user_context": {"user": {"id": "u-1", "email": "user@example.com"}}
 }
 ```
+
+`user_context` is optional and opaque: the service does not inspect or validate it, and forwards it
+to downstream MCP servers on `tools/call` requests as `_meta["codemie.ai/user-context"]`. Servers
+that do not read `_meta` ignore it.
 
 **When to use Single-Usage Mode:**
 - **One-time operations**: Bulk processing, data migrations, testing

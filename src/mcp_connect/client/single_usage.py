@@ -52,6 +52,7 @@ async def execute_single_usage_request(
     method: str,
     params: Any,
     timeout_ms: int,
+    meta: dict[str, Any] | None = None,
 ) -> Any:
     """
     Execute single-usage MCP request using simple SDK pattern.
@@ -73,6 +74,8 @@ async def execute_single_usage_request(
         method: MCP method name (e.g., "tools/call", "prompts/list")
         params: Method parameters
         timeout_ms: Timeout in milliseconds
+        meta: Optional request-scoped metadata forwarded to ``invoke_mcp_method``.
+            Opaque here — this layer attaches no meaning.
 
     Returns:
         Method result from MCP server
@@ -99,11 +102,11 @@ async def execute_single_usage_request(
 
     # Route to appropriate transport handler
     if transport_type == "stdio":
-        return await _execute_stdio_request(processed_request, method, params, timeout_sec)
+        return await _execute_stdio_request(processed_request, method, params, timeout_sec, meta=meta)
     elif transport_type == "streamable-http":
-        return await _execute_http_request(processed_request, method, params, timeout_sec)
+        return await _execute_http_request(processed_request, method, params, timeout_sec, meta=meta)
     elif transport_type == "sse":
-        return await _execute_sse_request(processed_request, method, params, timeout_sec)
+        return await _execute_sse_request(processed_request, method, params, timeout_sec, meta=meta)
     else:
         raise HTTPException(
             status_code=400,
@@ -116,6 +119,7 @@ async def _execute_stdio_request(
     method: str,
     params: Any,
     timeout_sec: float,
+    meta: dict[str, Any] | None = None,
 ) -> Any:
     """Execute single-usage stdio request using simple SDK pattern."""
     # Extract command and parameters
@@ -150,7 +154,7 @@ async def _execute_stdio_request(
 
                 # Execute method with timeout
                 result = await asyncio.wait_for(
-                    invoke_mcp_method(session, method, params),
+                    invoke_mcp_method(session, method, params, meta=meta),
                     timeout=timeout_sec,
                 )
 
@@ -199,6 +203,7 @@ async def _execute_http_request(
     method: str,
     params: Any,
     timeout_sec: float,
+    meta: dict[str, Any] | None = None,
 ) -> Any:
     """Execute single-usage HTTP request using simple SDK pattern."""
     headers = apply_user_agent_header(request.mcp_headers)
@@ -215,7 +220,7 @@ async def _execute_http_request(
 
                 # Execute method with timeout
                 result = await asyncio.wait_for(
-                    invoke_mcp_method(session, method, params),
+                    invoke_mcp_method(session, method, params, meta=meta),
                     timeout=timeout_sec,
                 )
 
@@ -264,6 +269,7 @@ async def _execute_sse_request(
     method: str,
     params: Any,
     timeout_sec: float,
+    meta: dict[str, Any] | None = None,
 ) -> Any:
     """Execute single-usage SSE request using simple SDK pattern."""
     logger.warning("SSE transport is deprecated. Please migrate to Streamable HTTP.")
@@ -288,7 +294,7 @@ async def _execute_sse_request(
 
                 # Execute method with timeout
                 result = await asyncio.wait_for(
-                    invoke_mcp_method(session, method, params),
+                    invoke_mcp_method(session, method, params, meta=meta),
                     timeout=timeout_sec,
                 )
 

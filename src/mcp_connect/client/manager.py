@@ -41,6 +41,7 @@ async def invoke_with_timeout(
     method: str,
     params: Any,
     timeout_ms: int,
+    meta: dict[str, Any] | None = None,
 ) -> Any:
     """
     Invoke MCP method with timeout protection.
@@ -53,6 +54,8 @@ async def invoke_with_timeout(
         method: MCP method name (e.g., "tools/call", "prompts/list")
         params: Method parameters
         timeout_ms: Timeout in milliseconds
+        meta: Optional request-scoped metadata forwarded to ``invoke_mcp_method``.
+            Opaque here — this layer attaches no meaning.
 
     Returns:
         Method result from MCP server
@@ -65,7 +68,7 @@ async def invoke_with_timeout(
 
     try:
         result = await asyncio.wait_for(
-            invoke_mcp_method(session, method, params),
+            invoke_mcp_method(session, method, params, meta=meta),
             timeout=timeout_sec,
         )
         return result

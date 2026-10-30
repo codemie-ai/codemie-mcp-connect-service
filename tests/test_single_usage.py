@@ -24,6 +24,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 
+from src.mcp_connect.client.manager import invoke_with_timeout
 from src.mcp_connect.client.single_usage import (
     execute_single_usage_request,
 )
@@ -792,3 +793,130 @@ class TestSseRequest:
             await execute_single_usage_request(request, "tools/list", {}, 5000)
 
         assert exc_info.value.status_code == 500
+
+
+class TestMetaForwarding:
+    """Task 5 (EPMCDME-14847): the generic ``meta`` dict is threaded through both
+    client-layer branches to ``invoke_mcp_method`` across all three transports."""
+
+    _META = {"codemie.ai/user-context": {"id": "u1"}}
+
+    @staticmethod
+    def _install_recorder(monkeypatch: Any) -> list[dict[str, Any]]:
+        """Patch the function-local import target and record each invocation."""
+        calls: list[dict[str, Any]] = []
+
+        async def recording_invoke(
+            session: Any,
+            method: str,
+            params: Any,
+            meta: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            calls.append({"method": method, "params": params, "meta": meta})
+            return {"tools": []}
+
+        monkeypatch.setattr(
+            "src.mcp_connect.client.methods.invoke_mcp_method",
+            recording_invoke,
+        )
+        return calls
+
+    @pytest.mark.asyncio
+    async def test_stdio_forwards_meta_to_invoke_mcp_method(self, monkeypatch):
+        """stdio branch forwards the meta dict down to invoke_mcp_method."""
+        calls = self._install_recorder(monkeypatch)
+        fake_context = FakeContext(("read-stream", "write-stream"))
+        monkeypatch.setattr(
+            "src.mcp_connect.client.single_usage.stdio_client",
+            lambda *a, **k: fake_context,
+        )
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
+
+        request = BridgeRequestBody(serverPath="echo", method="tools/list", params={})
+
+        await execute_single_usage_request(request, "tools/list", {}, 5000, meta=self._META)
+
+        assert calls and calls[0]["meta"] == self._META
+
+    @pytest.mark.asyncio
+    async def test_http_forwards_meta_to_invoke_mcp_method(self, monkeypatch):
+        """streamable-http branch forwards the meta dict down to invoke_mcp_method."""
+        calls = self._install_recorder(monkeypatch)
+        fake_context = FakeContext(("read-stream", "write-stream", lambda: "cleanup"))
+        monkeypatch.setattr(
+            "src.mcp_connect.client.single_usage.get_transport_ctx",
+            lambda *a, **k: fake_context,
+        )
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
+
+        request = BridgeRequestBody(
+            serverPath="http://example.com/mcp",
+            method="tools/list",
+            params={},
+        )
+
+        await execute_single_usage_request(request, "tools/list", {}, 5000, meta=self._META)
+
+        assert calls and calls[0]["meta"] == self._META
+
+    @pytest.mark.asyncio
+    async def test_sse_forwards_meta_to_invoke_mcp_method(self, monkeypatch):
+        """sse branch forwards the meta dict down to invoke_mcp_method."""
+        calls = self._install_recorder(monkeypatch)
+        fake_context = FakeContext(("read-stream", "write-stream"))
+        monkeypatch.setattr(
+            "src.mcp_connect.client.single_usage.sse_client",
+            lambda *a, **k: fake_context,
+        )
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
+
+        request = BridgeRequestBody(
+            serverPath="https://example.com/mcp",
+            method="tools/list",
+            params={},
+            http_transport_type="sse",
+        )
+
+        await execute_single_usage_request(request, "tools/list", {}, 5000, meta=self._META)
+
+        assert calls and calls[0]["meta"] == self._META
+
+    @pytest.mark.asyncio
+    async def test_default_omits_meta(self, monkeypatch):
+        """With no meta argument, invoke_mcp_method receives meta=None (byte-identical to main)."""
+        calls = self._install_recorder(monkeypatch)
+        fake_context = FakeContext(("read-stream", "write-stream"))
+        monkeypatch.setattr(
+            "src.mcp_connect.client.single_usage.stdio_client",
+            lambda *a, **k: fake_context,
+        )
+        monkeypatch.setattr("src.mcp_connect.client.single_usage.ClientSession", DummySession)
+
+        request = BridgeRequestBody(serverPath="echo", method="tools/list", params={})
+
+        await execute_single_usage_request(request, "tools/list", {}, 5000)
+
+        assert calls and calls[0]["meta"] is None
+
+    @pytest.mark.asyncio
+    async def test_invoke_with_timeout_forwards_meta(self, monkeypatch):
+        """Cached branch: invoke_with_timeout forwards meta down to invoke_mcp_method."""
+        calls: list[dict[str, Any]] = []
+
+        async def recording_invoke(
+            session: Any,
+            method: str,
+            params: Any,
+            meta: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            calls.append({"method": method, "params": params, "meta": meta})
+            return {"tools": []}
+
+        monkeypatch.setattr(
+            "src.mcp_connect.client.manager.invoke_mcp_method",
+            recording_invoke,
+        )
+
+        await invoke_with_timeout(object(), "tools/list", {}, 5000, meta=self._META)
+
+        assert calls and calls[0]["meta"] == self._META

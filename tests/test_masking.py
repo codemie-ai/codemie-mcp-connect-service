@@ -22,6 +22,7 @@ from src.mcp_connect.utils.masking import (
     is_sensitive_key,
     mask_dict_values,
     mask_sensitive_headers,
+    mask_user_context,
 )
 
 
@@ -259,3 +260,116 @@ def test_sensitive_patterns_regex_constant():
 
     assert isinstance(SENSITIVE_PATTERNS, re.Pattern)
     assert SENSITIVE_PATTERNS.flags & re.IGNORECASE  # Verify case-insensitive flag
+
+
+# Tests for mask_user_context()
+class TestMaskUserContext:
+    """Tests for mask_user_context() — defensive masking of the /bridge user_context object."""
+
+    def test_keep_readable_keys_scalar_values_emitted_verbatim(self):
+        """All eight keep-readable keys pass through unchanged for scalar values."""
+        ctx = {
+            "id": 42,
+            "roles": "admin",
+            "is_admin": True,
+            "is_maintainer": False,
+            "is_auditor": True,
+            "user_type": "internal",
+            "project_names": "proj-a",
+            "admin_project_names": "proj-b",
+        }
+        assert mask_user_context(ctx) == ctx
+
+    def test_keep_readable_keys_all_scalar_list_values_emitted_verbatim(self):
+        """Keep-readable keys pass through for lists whose every element is a scalar."""
+        ctx = {
+            "roles": ["admin", "user"],
+            "project_names": ["proj-a", "proj-b"],
+            "admin_project_names": [],
+            "id": [1, 2, 3],
+        }
+        assert mask_user_context(ctx) == {
+            "roles": ["admin", "user"],
+            "project_names": ["proj-a", "proj-b"],
+            "admin_project_names": [],
+            "id": [1, 2, 3],
+        }
+
+    def test_keep_readable_key_with_dict_value_is_redacted(self):
+        """A keep-readable key whose value is a dict is redacted, not emitted."""
+        assert mask_user_context({"roles": {"name": "admin"}}) == {"roles": REDACTED_VALUE}
+
+    def test_keep_readable_key_with_list_containing_dict_is_redacted(self):
+        """A keep-readable list with any non-scalar element is redacted wholesale."""
+        assert mask_user_context({"project_names": ["a", {"x": 1}]}) == {"project_names": REDACTED_VALUE}
+
+    def test_username_multi_char_is_first_char_plus_suffix(self):
+        """username longer than one char becomes first char plus a fixed suffix."""
+        assert mask_user_context({"username": "jdoe"}) == {"username": "j***"}
+
+    def test_username_single_char_is_redacted(self):
+        """username shorter than two chars is redacted, leaking no length."""
+        assert mask_user_context({"username": "j"}) == {"username": REDACTED_VALUE}
+
+    def test_username_none_is_redacted(self):
+        """username of None is redacted."""
+        assert mask_user_context({"username": None}) == {"username": REDACTED_VALUE}
+
+    def test_username_dict_is_redacted(self):
+        """username of a non-string type is redacted."""
+        assert mask_user_context({"username": {"a": 1}}) == {"username": REDACTED_VALUE}
+
+    def test_pii_keys_are_redacted(self):
+        """email, name, picture and extra_attributes are redacted wholesale."""
+        ctx = {
+            "email": "jdoe@example.com",
+            "name": "John Doe",
+            "picture": "https://example.com/jdoe.png",
+            "extra_attributes": {"department": "engineering"},
+        }
+        assert mask_user_context(ctx) == {
+            "email": REDACTED_VALUE,
+            "name": REDACTED_VALUE,
+            "picture": REDACTED_VALUE,
+            "extra_attributes": REDACTED_VALUE,
+        }
+
+    def test_unrecognised_key_is_redacted(self):
+        """A key not on the allowlist is redacted by default."""
+        assert mask_user_context({"some_new_field": "value"}) == {"some_new_field": REDACTED_VALUE}
+
+    def test_nested_dict_value_redacted_wholesale_not_traversed(self):
+        """A nested dict value is redacted wholesale, never traversed recursively."""
+        assert mask_user_context({"details": {"id": 1, "roles": ["admin"]}}) == {"details": REDACTED_VALUE}
+
+    def test_none_input_returns_none(self):
+        """None in, None out."""
+        assert mask_user_context(None) is None
+
+    def test_empty_dict_returns_empty_dict(self):
+        """Empty dict in, empty dict out."""
+        assert mask_user_context({}) == {}
+
+    def test_input_is_not_mutated(self):
+        """mask_user_context is pure — it does not mutate its input."""
+        original = {
+            "username": "jdoe",
+            "email": "jdoe@example.com",
+            "roles": ["admin", "user"],
+        }
+        masked = mask_user_context(original)
+
+        assert original == {
+            "username": "jdoe",
+            "email": "jdoe@example.com",
+            "roles": ["admin", "user"],
+        }
+        assert masked is not original
+
+    def test_list_value_is_copied_not_referenced(self):
+        """An emitted list is a copy, so later mutation cannot reach through it."""
+        roles = ["admin", "user"]
+        masked = mask_user_context({"roles": roles})
+
+        assert masked["roles"] == roles
+        assert masked["roles"] is not roles

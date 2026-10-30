@@ -55,6 +55,7 @@ async def invoke_mcp_method(
     session: ClientSession,
     method: str,
     params: Any,
+    meta: dict[str, Any] | None = None,
 ) -> Any:
     """Route MCP method strings to the appropriate ClientSession API.
 
@@ -62,6 +63,8 @@ async def invoke_mcp_method(
         session: Initialized MCP ClientSession.
         method: MCP method identifier (e.g., "tools/list").
         params: Method-specific parameters supplied by the request body.
+        meta: Optional request-scoped metadata forwarded as MCP ``_meta`` on
+            ``tools/call`` only. Opaque here — this layer attaches no meaning.
 
     Returns:
         The raw MCP SDK response for the invoked method.
@@ -99,6 +102,10 @@ async def invoke_mcp_method(
             _mask_params_recursive(clean_arguments),
         )
         try:
+            # EPMCDME-14847: pass meta only when truthy — call_tool's meta kwarg is
+            # keyword-only and an unconditional meta=None would change the call shape.
+            if meta:
+                return await session.call_tool(name, clean_arguments, meta=meta)
             return await session.call_tool(name, clean_arguments)
         except McpError as exc:
             # EPMCDME-11351: a downstream MCP protocol error (invalid params, unknown

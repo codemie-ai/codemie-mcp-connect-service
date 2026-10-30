@@ -38,6 +38,10 @@ class BridgeRequestBody(BaseModel):
     request_headers: dict[str, str] | None = Field(None, description="Headers available for $headers substitution")
     http_transport_type: str | None = Field(None, description="Preferred HTTP transport (streamable-http or sse)")
     single_usage: bool = Field(False, description="Bypass client cache when true")
+    user_context: dict[str, Any] | None = Field(
+        default=None,
+        description="Opaque user context forwarded to tools/call as _meta['codemie.ai/user-context']",
+    )
 
     # Context fields for logging/observability
     user_id: str | None = Field(None, description="Optional user identifier for logging")

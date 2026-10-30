@@ -36,7 +36,7 @@ from ..utils.errors import (
     get_stacktrace_string,
 )
 from ..utils.logger import get_log_level, get_logger
-from ..utils.masking import mask_dict_values
+from ..utils.masking import mask_dict_values, mask_user_context
 from .middleware import setup_request_context, verify_token
 
 router = APIRouter()
@@ -45,8 +45,68 @@ logger = get_logger(__name__)
 # Load default timeout from environment (Story 3.6)
 DEFAULT_TIMEOUT_MS = int(os.getenv("MCP_CONNECT_DEFAULT_TIMEOUT", "120000"))
 
-# Debug configuration for payload logging
-DEBUG_LOG_BRIDGE_PAYLOAD = os.getenv("DEBUG_LOG_BRIDGE_PAYLOAD", "false").lower() in ("true", "1", "yes")
+# EPMCDME-14847: namespaced MCP _meta key under which an inbound user_context is
+# forwarded to downstream tools/call. The route layer is the only place that knows
+# this dict is a user context; the client layer treats meta as opaque.
+USER_CONTEXT_META_KEY = "codemie.ai/user-context"
+
+# EPMCDME-14847: the only method that forwards meta downstream (invoke_mcp_method).
+# Matched after strip(), the same normalization invoke_mcp_method applies.
+_META_FORWARDING_METHOD = "tools/call"
+
+
+def _build_user_context_meta(request: BridgeRequestBody) -> dict[str, Any] | None:
+    """Build the namespaced meta dict for an inbound user_context.
+
+    Returns ``{USER_CONTEXT_META_KEY: request.user_context}`` only when a
+    user_context is present *and* the method is ``tools/call`` — the sole method
+    that forwards meta downstream. Any other method, or a missing/empty
+    user_context, returns ``None`` and logs nothing: a user_context on a
+    non-``tools/call`` method is silently ignored (EPMCDME-14847), so the INFO
+    line never asserts a forward that did not happen. An empty dict is treated as
+    absent (plain truthiness, matching the substitution convention).
+
+    Args:
+        request: The parsed bridge request body.
+
+    Returns:
+        The namespaced meta dict, or None when nothing is forwarded.
+    """
+    if not request.user_context or request.method.strip() != _META_FORWARDING_METHOD:
+        return None
+    logger.info(
+        "Forwarding user_context to downstream tools/call as MCP _meta",
+        extra={"user_context": mask_user_context(request.user_context)},
+    )
+    return {USER_CONTEXT_META_KEY: request.user_context}
+
+
+def _debug_log_bridge_payload(request: BridgeRequestBody) -> None:
+    """Dump the full bridge payload at DEBUG when DEBUG_LOG_BRIDGE_PAYLOAD is truthy.
+
+    The flag is read here, per request, rather than once at import: it is now a
+    dynamic toggle that takes effect without a process restart. This is a
+    deliberate, documented behaviour change (EPMCDME-14847).
+
+    Sensitive data is masked before logging: ``request_headers`` wholesale,
+    ``env`` by sensitive key, and ``user_context`` via ``mask_user_context``.
+
+    Args:
+        request: The parsed bridge request body.
+    """
+    if os.getenv("DEBUG_LOG_BRIDGE_PAYLOAD", "false").lower() not in ("true", "1", "yes"):
+        return
+
+    payload_dict = request.model_dump(mode="json", exclude_none=True)
+    # Mask sensitive data in the payload
+    if "request_headers" in payload_dict and payload_dict["request_headers"]:
+        payload_dict["request_headers"] = mask_dict_values(payload_dict["request_headers"], mask_all=True)
+    if "env" in payload_dict and payload_dict["env"]:
+        payload_dict["env"] = mask_dict_values(payload_dict["env"], mask_all=False)
+    # EPMCDME-14847: user_context is a PII-bearing dict; redact before dumping.
+    if "user_context" in payload_dict:
+        payload_dict["user_context"] = mask_user_context(payload_dict["user_context"])
+    logger.debug("Bridge endpoint payload: %s", payload_dict)
 
 
 def format_error_response(exception: Exception, base_message: str) -> dict[str, Any]:
@@ -133,8 +193,9 @@ async def _handle_single_usage_request(request: BridgeRequestBody, timeout_ms: i
         HTTPException: On validation or execution failure
     """
     logger.info("Single-usage mode: using simple SDK pattern")
+    meta = _build_user_context_meta(request)
     try:
-        result = await execute_single_usage_request(request, request.method, request.params, timeout_ms)
+        result = await execute_single_usage_request(request, request.method, request.params, timeout_ms, meta=meta)
         return result
     except HTTPException:
         # Already formatted by single_usage module
@@ -201,8 +262,9 @@ async def _handle_cached_client_request(request: BridgeRequestBody, timeout_ms: 
         raise HTTPException(status_code=500, detail=error_response) from exc
 
     # Execute method with timeout protection
+    meta = _build_user_context_meta(request)
     try:
-        result = await invoke_with_timeout(session, request.method, request.params, timeout_ms)
+        result = await invoke_with_timeout(session, request.method, request.params, timeout_ms, meta=meta)
         return result
     except HTTPException as exc:
         logger.error(
@@ -272,15 +334,8 @@ async def bridge_endpoint(
     # Setup request context for logging correlation (Story 4.3)
     await setup_request_context(request)
 
-    # Log complete bridge payload if debug logging is enabled
-    if DEBUG_LOG_BRIDGE_PAYLOAD:
-        payload_dict = request.model_dump(mode="json", exclude_none=True)
-        # Mask sensitive data in the payload
-        if "request_headers" in payload_dict and payload_dict["request_headers"]:
-            payload_dict["request_headers"] = mask_dict_values(payload_dict["request_headers"], mask_all=True)
-        if "env" in payload_dict and payload_dict["env"]:
-            payload_dict["env"] = mask_dict_values(payload_dict["env"], mask_all=False)
-        logger.debug("Bridge endpoint payload: %s", payload_dict)
+    # Log complete bridge payload if debug logging is enabled (flag read per request)
+    _debug_log_bridge_payload(request)
 
     # Log with masked request headers (all values sensitive)
     if request.request_headers:

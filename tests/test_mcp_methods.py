@@ -129,6 +129,32 @@ async def test_tools_call_preserves_falsy_non_none_values(session) -> None:
 
 
 @pytest.mark.asyncio
+async def test_tools_call_forwards_meta_when_provided(session) -> None:
+    """EPMCDME-14847: a truthy meta dict is forwarded to call_tool as the meta kwarg."""
+    meta = {"codemie.ai/user-context": {"id": "u1"}}
+
+    await invoke_mcp_method(session, "tools/call", {"name": "echo", "arguments": {"text": "hi"}}, meta=meta)
+
+    session.call_tool.assert_awaited_once_with("echo", {"text": "hi"}, meta=meta)
+
+
+@pytest.mark.asyncio
+async def test_tools_call_omits_meta_kwarg_when_none(session) -> None:
+    """EPMCDME-14847: meta=None must produce no meta kwarg at all on call_tool."""
+    await invoke_mcp_method(session, "tools/call", {"name": "echo", "arguments": {"text": "hi"}}, meta=None)
+
+    session.call_tool.assert_awaited_once_with("echo", {"text": "hi"})
+
+
+@pytest.mark.asyncio
+async def test_tools_list_ignores_meta(session) -> None:
+    """EPMCDME-14847: meta is a tools/call-only concern — tools/list must not receive it."""
+    await invoke_mcp_method(session, "tools/list", None, meta={"codemie.ai/user-context": {"id": "u1"}})
+
+    session.list_tools.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
 async def test_tools_call_mcp_error_returns_iserror_result(session) -> None:
     """EPMCDME-11351: a downstream MCP protocol error must surface as an isError tool
     result (not propagate to a generic HTTP 500)."""

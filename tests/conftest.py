@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -77,7 +78,10 @@ def mock_mcp_client():
 
         # execute_single_usage_request returns the result directly
         # Use side_effect to return different results based on method
-        def single_usage_side_effect(request, method, params, timeout_ms):
+        def single_usage_side_effect(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            # Extract method from either positional args or kwargs
+            method: str = args[1] if len(args) > 1 else kwargs.get("method", "")
+
             if method == "tools/call":
                 return {"result": "tools/call"}
             elif method == "tools/list":

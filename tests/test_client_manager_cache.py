@@ -166,6 +166,29 @@ async def test_different_requests_generate_different_keys():
 
 
 @pytest.mark.asyncio
+async def test_user_context_does_not_affect_cache_key():
+    """user_context must not change the cache key.
+
+    Pins that cache.py's five-key allowlist ignores user_context, so adding the
+    field to the request model does not fragment the client cache.
+    """
+    from src.mcp_connect.client.cache import generate_cache_key
+
+    base = {
+        "serverPath": "npx",
+        "method": "ping",
+        "params": {},
+        "args": ["-y", "@modelcontextprotocol/server-everything"],
+        "env": {"NODE_ENV": "test"},
+    }
+
+    request_without = BridgeRequestBody(**base)
+    request_with = BridgeRequestBody(**base, user_context={"user": {"id": "u-1"}})
+
+    assert generate_cache_key(request_without) == generate_cache_key(request_with)
+
+
+@pytest.mark.asyncio
 async def test_cache_hit_logging(cache, mock_client_handle, sample_request, caplog):
     """Test that cache hit generates appropriate log message."""
     import logging

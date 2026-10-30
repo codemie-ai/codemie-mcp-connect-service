@@ -16,12 +16,17 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 from mcp.types import ListToolsResult, Tool
+
+from mcp_connect.models.request import BridgeRequestBody
+from mcp_connect.server import routes as routes_module
+from mcp_connect.utils.masking import mask_user_context
 
 pytestmark = pytest.mark.asyncio
 
@@ -104,6 +109,159 @@ async def test_unknown_field_returns_400(
 
     assert response.status_code == 400
     assert response.json()["detail"][0]["type"] == "extra_forbidden"
+
+
+async def test_user_context_is_accepted_returns_200(
+    async_client: httpx.AsyncClient,
+    mock_mcp_client: AsyncMock,
+) -> None:
+    payload = _base_payload()
+    payload["user_context"] = {
+        "user": {"id": "u-1", "email": "user@example.com"},
+        "roles": ["admin"],
+    }
+
+    response = await async_client.post("/bridge", json=payload)
+
+    assert response.status_code == 200
+
+
+async def test_unknown_field_still_forbidden_alongside_user_context(
+    async_client: httpx.AsyncClient,
+) -> None:
+    payload = _base_payload()
+    payload["user_context"] = {"user": {"id": "u-1"}}
+    payload["totallyUnknownField"] = "value"
+
+    response = await async_client.post("/bridge", json=payload)
+
+    assert response.status_code == 400
+    assert response.json()["detail"][0]["type"] == "extra_forbidden"
+
+
+async def test_none_user_context_excluded_from_model_dump() -> None:
+    body = BridgeRequestBody(**_base_payload(), user_context=None)
+
+    dumped = body.model_dump(exclude_none=True)
+
+    assert "user_context" not in dumped
+
+
+async def test_user_context_forwarded_as_namespaced_meta_single_usage(
+    async_client: httpx.AsyncClient,
+    mock_mcp_client: AsyncMock,
+) -> None:
+    payload = _base_payload()
+    payload["method"] = "tools/call"
+    payload["params"] = {"name": "echo", "arguments": {"text": "hi"}}
+    payload["single_usage"] = True
+    payload["user_context"] = {"user": {"id": "u-1"}, "roles": ["admin"]}
+
+    response = await async_client.post("/bridge", json=payload)
+
+    assert response.status_code == 200
+    meta = routes_module.execute_single_usage_request.await_args.kwargs["meta"]
+    assert meta == {"codemie.ai/user-context": {"user": {"id": "u-1"}, "roles": ["admin"]}}
+
+
+async def test_user_context_forwarded_as_namespaced_meta_cached(
+    async_client: httpx.AsyncClient,
+    mock_mcp_client: AsyncMock,
+) -> None:
+    payload = _base_payload()
+    payload["method"] = "tools/call"
+    payload["params"] = {"name": "echo", "arguments": {"text": "hi"}}
+    payload["user_context"] = {"user": {"id": "u-1"}, "roles": ["admin"]}
+
+    with patch(
+        "mcp_connect.server.routes.invoke_with_timeout",
+        new_callable=AsyncMock,
+    ) as mock_invoke:
+        mock_invoke.return_value = {"result": "tools/call"}
+
+        response = await async_client.post("/bridge", json=payload)
+
+    assert response.status_code == 200
+    meta = mock_invoke.await_args.kwargs["meta"]
+    assert meta == {"codemie.ai/user-context": {"user": {"id": "u-1"}, "roles": ["admin"]}}
+
+
+async def test_user_context_omitted_forwards_meta_none(
+    async_client: httpx.AsyncClient,
+    mock_mcp_client: AsyncMock,
+) -> None:
+    payload = _base_payload()
+    payload["single_usage"] = True
+
+    response = await async_client.post("/bridge", json=payload)
+
+    assert response.status_code == 200
+    assert routes_module.execute_single_usage_request.await_args.kwargs["meta"] is None
+
+
+async def test_empty_user_context_treated_as_absent(
+    async_client: httpx.AsyncClient,
+    mock_mcp_client: AsyncMock,
+) -> None:
+    payload = _base_payload()
+    payload["single_usage"] = True
+    payload["user_context"] = {}
+
+    response = await async_client.post("/bridge", json=payload)
+
+    assert response.status_code == 200
+    assert routes_module.execute_single_usage_request.await_args.kwargs["meta"] is None
+
+
+async def test_user_context_not_forwarded_or_logged_for_non_tools_call_method(
+    async_client: httpx.AsyncClient,
+    mock_mcp_client: AsyncMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """CR-001 (EPMCDME-14847): a user_context on a non-``tools/call`` method must not
+    forward ``meta`` and must not emit the "Forwarding user_context" INFO line —
+    the line previously asserted a downstream forward that never happened."""
+    payload = _base_payload()
+    payload["method"] = "tools/list"
+    payload["params"] = {}
+    payload["single_usage"] = True
+    payload["user_context"] = {"user": {"id": "u-1"}, "roles": ["admin"]}
+
+    with caplog.at_level(logging.INFO, logger="mcp_connect.server.routes"):
+        response = await async_client.post("/bridge", json=payload)
+
+    assert response.status_code == 200
+    assert routes_module.execute_single_usage_request.await_args.kwargs["meta"] is None
+    assert not any("Forwarding user_context" in record.getMessage() for record in caplog.records)
+
+
+async def test_user_context_route_log_line_is_masked(
+    async_client: httpx.AsyncClient,
+    mock_mcp_client: AsyncMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    raw_context = {
+        "username": "alicesmith",
+        "email": "alicesmith@corp.example",
+        "roles": ["admin"],
+    }
+    payload = _base_payload()
+    payload["method"] = "tools/call"
+    payload["params"] = {"name": "echo", "arguments": {"text": "hi"}}
+    payload["single_usage"] = True
+    payload["user_context"] = dict(raw_context)
+
+    with caplog.at_level(logging.INFO, logger="mcp_connect.server.routes"):
+        response = await async_client.post("/bridge", json=payload)
+
+    assert response.status_code == 200
+
+    masked = mask_user_context(raw_context)
+    assert any(getattr(record, "user_context", None) == masked for record in caplog.records)
+
+    dumped = "\n".join(f"{record.getMessage()} {record.__dict__}" for record in caplog.records)
+    assert "alicesmith@corp.example" not in dumped
+    assert "alicesmith" not in dumped
 
 
 async def test_valid_request_with_required_fields_returns_method_result(

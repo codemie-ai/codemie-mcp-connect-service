@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "task": "Accept an optional user_context field on /bridge and forward it to downstream MCP tools as _meta under codemie.ai/user-context on tools/call only, with defensive PII masking in service logs.",
+  "generated": "2026-09-09T00:00:00Z",
+  "dimensions": {
+    "component_scope":      { "score": 4, "label": "L" },
+    "requirements_clarity": { "score": 2, "label": "S" },
+    "technical_risk":       { "score": 5, "label": "XL" },
+    "file_change_estimate": { "score": 4, "label": "L" },
+    "dependencies":         { "score": 1, "label": "XS" },
+    "affected_layers":      { "score": 3, "label": "M" }
+  },
+  "total": 19,
+  "size": "M",
+  "size_legend": {
+    "XS": "6-9 — < half day — plan directly",
+    "S": "10-14 — 1 day — plan directly",
+    "M": "15-20 — 2-3 days — brainstorm first",
+    "L": "21-26 — 4-5 days — brainstorm first",
+    "XL": "27-31 — > 1 sprint — recommend splitting",
+    "XXL": "32-36 — > 1 sprint — must split"
+  },
+  "routing": "brainstorming",
+  "key_reasoning": [
+    {
+      "dimension": "component_scope",
+      "reason": "Six source components across three layers plus a shared utility: models/request.py (BridgeRequestBody), server/routes.py (bridge_endpoint and both mode handlers), client/manager.py (invoke_with_timeout), client/single_usage.py (execute_single_usage_request plus three transport helpers), client/methods.py (invoke_mcp_method tools/call branch), and utils/masking.py (new mask_user_context). Scope is bounded rather than XL because the analysis confirmed managed.py/ManagedClient has no parallel invocation path, and generate_cache_key, apply_substitutions and extract_request_context are explicit field allowlists so the new field is inert in all three by construction."
+    },
+    {
+      "dimension": "technical_risk",
+      "reason": "The closest existing pattern is utils/masking.py's flat dict[str, str] maskers plus the private _mask_params_recursive in methods.py; neither covers the security-sensitive aspect of this work — recursive traversal of an opaque nested dict with per-key policy and partial redaction of username, with SENSITIVE_PATTERNS explicitly off-limits for widening. That is a divergence from precedent on a PII-exposure path, so Technical Risk was raised. Compounding it: the DEBUG_LOG_BRIDGE_PAYLOAD block (routes.py:276-283) is the untested, opt-in-by-env place a new top-level field leaks in the clear; the mcp 1.30.0 call_tool meta kwarg could not be verified on disk; and mypy --strict is the only gate with no CI behind it. Not scored XXL because the change is fully reversible — field absent means no meta passed and byte-identical behaviour."
+    },
+    {
+      "dimension": "file_change_estimate",
+      "reason": "Roughly 8-12 modified files, 0-1 new: six source files, README.md, tests/conftest.py (its fixed four-positional single_usage_side_effect sits on a changed signature), plus edits to test_mcp_methods.py, test_masking.py, test_bridge_validation.py and a first-of-its-kind negative cache-key test. Sits at the L/XL boundary on modified count but lands at L because new files are 0-1, far below XL's 4-6."
+    }
+  ],
+  "red_flags_applied": [
+    "Technical Risk bumped from L to XL: PII handling and log-exposure prevention are a primary requirement (defensive masking of an opaque user_context, untested DEBUG_LOG_BRIDGE_PAYLOAD dump path).",
+    "Sanitization red flag checked: no existing reusable masking util is adequate for the nested/partial-redaction surface. Technical Risk floor of L already exceeded by the applied bump, so no further increase.",
+    "Edge-case test-template gap noted (no precedent for a negative cache-key test, no nested/partial masking test block, no direct route-handler tests). Recorded as part of the same Technical Risk divergence rather than a second additive bump, since it stems from the identical missing-precedent signal."
+  ],
+  "split_recommendation": null
+}
