@@ -49,10 +49,11 @@ RUN --mount=type=cache,target=/var/cache/apk \
 # Clone and build GitHub MCP Server from specific tag
 RUN git clone --branch latest-release --depth 1 https://github.com/github/github-mcp-server.git .
 
-# Security (EPMCDME-15803): pin golang.org/x/net v0.60.0 to fix CVE-2026-78669 (GO-2026-6611); installed v0.59.0
+# Security (EPMCDME-15803): pin golang.org/x/net to fix CVE-2026-78669 (GO-2026-6611); installed v0.59.0
+# Security (EPMCDME-17027): bump golang.org/x/net to v0.62.0 to fix CVE-2026-78661 (GO-2026-6860); installed v0.60.0
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go get golang.org/x/net@v0.60.0 && CGO_ENABLED=0 go mod tidy
+    CGO_ENABLED=0 go get golang.org/x/net@v0.62.0 && CGO_ENABLED=0 go mod tidy
 
 # Build with architecture support and optimizations
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -74,12 +75,16 @@ USER root
 # Security (EPMCDME-14396): pin libssl3t64/openssl/openssl-provider-legacy >=3.5.7-1~deb13u2
 # to fix CVE-2026-14456; bumped to deb13u3 because apt-get upgrade already installs it and an
 # older exact pin fails with "Packages were downgraded"
+# Security (EPMCDME-17025, EPMCDME-17026): pin zlib1g/libminizip1t64 >=1:1.3.dfsg+really1.3.1-1+deb13u1
+# to fix CVE-2026-76844, CVE-2026-85091
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         libssl3t64=3.5.7-1~deb13u3 \
         openssl=3.5.7-1~deb13u3 \
         openssl-provider-legacy=3.5.7-1~deb13u3 \
+        zlib1g=1:1.3.dfsg+really1.3.1-1+deb13u1 \
+        libminizip1t64=1:1.3.dfsg+really1.3.1-1+deb13u1 \
         # Core utilities
         wget \
         curl \
