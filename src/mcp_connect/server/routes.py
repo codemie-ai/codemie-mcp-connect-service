@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
+from ..client.instructions import attach_server_instructions
 from ..client.manager import get_or_create_client, invoke_with_timeout
 from ..client.single_usage import execute_single_usage_request
 from ..models import BridgeRequestBody
@@ -265,7 +266,7 @@ async def _handle_cached_client_request(request: BridgeRequestBody, timeout_ms: 
     meta = _build_user_context_meta(request)
     try:
         result = await invoke_with_timeout(session, request.method, request.params, timeout_ms, meta=meta)
-        return result
+        return attach_server_instructions(result, request.method, handle.instructions)
     except HTTPException as exc:
         logger.error(
             "HTTPException occurred: status=%d, detail=%s",

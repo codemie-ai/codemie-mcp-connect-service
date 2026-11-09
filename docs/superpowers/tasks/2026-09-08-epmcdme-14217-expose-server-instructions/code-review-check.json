@@ -1,0 +1,32 @@
+{
+  "decision": "approve",
+  "rationale": "All four findings from code-review-final.json verified resolved by an adversarial check that proved each fix by mutation rather than by reading: reverting each of the six transport bodies one at a time makes exactly one parametrized test fail, and removing each new guard makes its own tests fail. One new finding was raised by the check round (CR-005: README still claimed the text was passed through unaltered after the fix-up made the bridge truncate and strip it, and the new env var was undocumented) and was fixed in the same round, commit 'Document the instruction size cap and no-overwrite rule'. Residual noted but not blocking: the raw unbounded string is still held in memory on ManagedClient for the cache TTL; only the response and its token cost are capped.",
+  "confidence": "high",
+  "risk_flags": [],
+  "business_review": [
+    {"criterion": "1. instructions captured at handshake, not discarded, at every call site", "status": "pass", "notes": "carried forward from code-review-final.json"},
+    {"criterion": "2. stored next to the session, survives for the pooled session's lifetime, returned on tools/list", "status": "pass", "notes": "carried forward"},
+    {"criterion": "3. subsequent calls reuse the retrieved instructions, no re-derivation", "status": "pass", "notes": "carried forward"},
+    {"criterion": "4. backward compatible for servers without instructions", "status": "pass", "notes": "carried forward; now additionally proven against a real ListToolsResult through /bridge"},
+    {"criterion": "5. managed and single-usage emit identical JSON", "status": "pass", "notes": "carried forward; both paths now proven to share the single sanitize/attach chokepoint"},
+    {"criterion": "6. instructions on every page of paginated tools/list, no other method", "status": "pass", "notes": "carried forward"},
+    {"criterion": "7. automated regression coverage incl. a real MCP server", "status": "pass", "notes": "carried forward; the integration run is now quality gate 8 rather than silently deselected"},
+    {"criterion": "8. key is exactly `instructions` at top level, documented", "status": "pass", "notes": "carried forward; README now documents the cap, the control-character strip and the no-overwrite rule"}
+  ],
+  "standards_review": [
+    {"standard": "git-workflow.md commit format EPMCDME-XXXX: <Imperative>", "status": "pass", "notes": "carried forward; the two fix-up commits conform"},
+    {"standard": "security/README.md", "status": "pass", "notes": "carried forward; no dependency or lock change, gitleaks clean"},
+    {"standard": "development-practices.md context7 mandate", "status": "pass", "notes": "carried forward"},
+    {"standard": "quality-gates.md", "status": "pass", "notes": "382 unit passed / 1 deselected / 92% coverage, 1 integration passed, ruff, black, mypy --strict all clean, gitleaks no leaks"},
+    {"standard": "code-quality.md", "status": "na", "notes": "guide absent"},
+    {"standard": "AGENTS.md:205 — /bridge response schema change is Ask-first", "status": "pass", "notes": "user approved; MR description must state it"}
+  ],
+  "finding_status": [
+    {"id": "CR-001", "status": "resolved", "evidence": "sanitize_instructions (instructions.py:82-111) is called from the single chokepoint attach_server_instructions:133, which is the only route to a response on all four call sites (routes.py:207; single_usage.py:158,223,296). 20000 chars -> 8192 emitted with a truncation warning; only-control-char input -> dropped, not emitted empty; tab/LF/CR preserved, ESC stripped. Reverting the sanitize call fails 3 tests."},
+    {"id": "CR-002", "status": "resolved", "evidence": "Guards at instructions.py:138-140 (dict) and :145-147 (pydantic). Real ListToolsResult carrying instructions='from-server' plus an extra key comes back with the server value kept and the extra key intact. Removing both guards fails 2 tests."},
+    {"id": "CR-003", "status": "resolved", "evidence": "try/except (ValueError, TypeError, AttributeError) at instructions.py:148-153 plus a warning on the unsupported-type fall-through. A frozen model and an extra=forbid model both come back as the same object, unchanged. Removing the try/except fails 2 tests. Docstring now matches the real aliasing."},
+    {"id": "CR-004", "status": "resolved", "evidence": "Proven by source mutation in a throwaway copy: reverting each of managed.py:256,292,329 individually yields '1 failed, 4 passed' each time, and neutralizing each of single_usage.py:158,223,296 individually yields '1 failed, 3 passed' each time — so all six bodies are independently covered. /bridge now exercises a real ListToolsResult in both the with- and without-instructions cases. quality-gates.md gate 8 added and the stale 'exit 5 / coverage absent' trap row corrected."},
+    {"id": "CR-005", "status": "resolved", "evidence": "New finding raised and fixed in this round: README.md now documents the control-character strip, the MCP_CONNECT_MAX_INSTRUCTIONS_CHARS cap and the no-overwrite rule, and the env var is listed in both the README env table (README.md:534) and .env.example:13."}
+  ],
+  "findings": []
+}

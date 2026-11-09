@@ -205,6 +205,39 @@ that do not read `_meta` ignore it.
 3. **Resource Management**: Prevents memory buildup for infrequent operations
 4. **Higher Latency**: Trade-off of connection setup time for immediate resource cleanup
 
+## Server Instructions on `tools/list`
+
+An MCP server may return an `instructions` string in its `initialize` handshake,
+describing how its tools are meant to be used. For the `tools/list` method the
+bridge attaches that string to the response as a top-level `instructions` field:
+
+```json
+{
+  "tools": [{ "name": "echo", "description": "Echo the given text." }],
+  "instructions": "Always call the tool with sysparm_help=true before first use."
+}
+```
+
+The field is additive and optional. A server that sends no instructions produces
+a response with no `instructions` key, exactly as before. The field behaves the
+same in cached and single-usage mode, is attached to every page of a paginated
+`tools/list`, and is never attached to any other method.
+
+If the `tools/list` result already carries an `instructions` key of its own, the
+server's value is kept and the handshake value is dropped, with a warning logged.
+The bridge never overwrites server-authored content.
+
+The text comes from a third-party server and ends up in an LLM system prompt, so
+the bridge cleans it once, when the handshake is captured: control characters and
+invisible or bidi-reordering characters are removed (tab, newline and carriage
+return survive, and zero-width joiners are kept for emoji), and the text is capped
+at `MCP_CONNECT_MAX_INSTRUCTIONS_CHARS` characters. Longer text is cut at a word
+boundary and ends with a `[instructions truncated by MCP Connect]` marker, and a
+warning with the original length is logged once per session. An invalid or
+non-positive value falls back to 8192 with a warning. Nothing else about the
+wording is changed — a consumer that splices the text into a prompt still owns
+escaping it for that context.
+
 ## Exposing Container to CodeMie Platform
 
 To use your container with the CodeMie platform, it must be reachable from the CodeMie cloud
@@ -506,6 +539,7 @@ The container supports the following environment variables:
 | **MCP Client Configuration** |
 | `MCP_CONNECT_INIT_TIMEOUT` | 30000 | MCP session initialization timeout in milliseconds (30 seconds) |
 | `MCP_CONNECT_DEFAULT_TIMEOUT` | 120000 | Default timeout for MCP method invocations in milliseconds (2 minutes) |
+| `MCP_CONNECT_MAX_INSTRUCTIONS_CHARS` | 8192 | Maximum length of server-supplied `instructions` relayed on `tools/list`; longer text is truncated |
 | `MCP_CONNECT_CLIENT_CACHE_TTL` | 300000 | Client cache TTL in milliseconds before expiration (5 minutes) |
 | `MCP_CONNECT_CACHE_CLEANUP_INTERVAL` | 60000 | Cleanup scheduler interval for removing expired clients in milliseconds (1 minute) |
 | `MCP_CONNECT_HTTP_TIMEOUT` | 30000 | HTTP connection timeout for streamable-http/SSE transports in milliseconds (30 seconds) |

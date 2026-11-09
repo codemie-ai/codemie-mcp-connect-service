@@ -271,6 +271,7 @@ poetry run ruff check --fix src/ tests/
 |---|---|---|
 | `MCP_CONNECT_INIT_TIMEOUT` | 30000 | Client initialization timeout (milliseconds) |
 | `MCP_CONNECT_DEFAULT_TIMEOUT` | 120000 | MCP method execution timeout (milliseconds) |
+| `MCP_CONNECT_MAX_INSTRUCTIONS_CHARS` | 8192 | Max length of server `instructions` relayed on `tools/list`; invalid values fall back to 8192 |
 | `MCP_CONNECT_CLIENT_CACHE_TTL` | 300000 | Client cache TTL (milliseconds, 5 minutes) |
 | `MCP_CONNECT_HTTP_TIMEOUT` | 30000 | HTTP transport timeout (milliseconds) |
 | `MCP_CONNECT_SSE_READ_TIMEOUT` | 300000 | SSE transport read timeout (milliseconds) |

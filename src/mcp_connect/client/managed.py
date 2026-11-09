@@ -33,6 +33,7 @@ from ..models.request import BridgeRequestBody
 from ..utils.logger import get_logger
 from ..utils.masking import mask_sensitive_headers
 from .client_info import apply_user_agent_header, get_client_info
+from .instructions import SessionHandshake, initialize_session
 
 logger = get_logger(__name__)
 
@@ -73,7 +74,10 @@ class ManagedClient:
     # Internal state
     _cleanup_event: asyncio.Event  # Signal to exit contexts
     _task: asyncio.Task[None]  # Dedicated task running contexts
-    _ready_future: asyncio.Future[ClientSession]  # Signals initialization complete
+    _ready_future: asyncio.Future[SessionHandshake]  # Signals initialization complete
+
+    # Captured at handshake; None when the server sends none
+    instructions: str | None = None
 
     @classmethod
     async def spawn(cls, request: BridgeRequestBody) -> ManagedClient:
@@ -93,14 +97,14 @@ class ManagedClient:
             Exception: If client initialization fails
         """
         cleanup_event = asyncio.Event()
-        ready_future: asyncio.Future[ClientSession] = asyncio.Future()
+        ready_future: asyncio.Future[SessionHandshake] = asyncio.Future()
 
         # Spawn dedicated task
         task = asyncio.create_task(cls._run_client_lifecycle(request, cleanup_event, ready_future))
 
         # Wait for initialization to complete
         try:
-            session = await asyncio.wait_for(ready_future, timeout=30.0)
+            handshake = await asyncio.wait_for(ready_future, timeout=30.0)
             logger.info(
                 "Managed client spawned successfully",
                 extra={"server_path": request.serverPath[:50]},
@@ -125,10 +129,11 @@ class ManagedClient:
             raise
 
         return cls(
-            session=session,
+            session=handshake.session,
             _cleanup_event=cleanup_event,
             _task=task,
             _ready_future=ready_future,
+            instructions=handshake.instructions,
         )
 
     async def cleanup(self) -> None:
@@ -166,7 +171,7 @@ class ManagedClient:
     async def _run_client_lifecycle(
         request: BridgeRequestBody,
         cleanup_event: asyncio.Event,
-        ready_future: asyncio.Future[ClientSession],
+        ready_future: asyncio.Future[SessionHandshake],
     ) -> None:
         """
         Dedicated task that owns client lifecycle.
@@ -227,7 +232,7 @@ class ManagedClient:
     async def _run_stdio_client(
         request: BridgeRequestBody,
         cleanup_event: asyncio.Event,
-        ready_future: asyncio.Future[ClientSession],
+        ready_future: asyncio.Future[SessionHandshake],
     ) -> None:
         """Run stdio transport client in dedicated task."""
         from mcp.client.stdio import StdioServerParameters, stdio_client
@@ -244,11 +249,11 @@ class ManagedClient:
         # Enter contexts - these will stay open until cleanup signal
         async with stdio_client(server_params) as (read, write):
             async with ClientSession(read, write, client_info=get_client_info()) as session:
-                # Initialize session
-                await asyncio.wait_for(session.initialize(), timeout=INIT_TIMEOUT_SECONDS)
+                # Initialize session, keeping what the handshake disclosed
+                instructions = await initialize_session(session, INIT_TIMEOUT_SECONDS)
 
                 # Signal ready - caller can now use session
-                ready_future.set_result(session)
+                ready_future.set_result(SessionHandshake(session=session, instructions=instructions))
 
                 logger.debug("Session ready, waiting for cleanup signal")
 
@@ -264,7 +269,7 @@ class ManagedClient:
     async def _run_streamable_http_client(
         request: BridgeRequestBody,
         cleanup_event: asyncio.Event,
-        ready_future: asyncio.Future[ClientSession],
+        ready_future: asyncio.Future[SessionHandshake],
     ) -> None:
         """Run Streamable HTTP transport client in dedicated task."""
 
@@ -278,11 +283,11 @@ class ManagedClient:
 
         async with get_transport_ctx(request, headers) as (read, write, *rest):
             async with ClientSession(read, write, client_info=get_client_info()) as session:
-                # Initialize session
-                await asyncio.wait_for(session.initialize(), timeout=INIT_TIMEOUT_SECONDS)
+                # Initialize session, keeping what the handshake disclosed
+                instructions = await initialize_session(session, INIT_TIMEOUT_SECONDS)
 
                 # Signal ready
-                ready_future.set_result(session)
+                ready_future.set_result(SessionHandshake(session=session, instructions=instructions))
 
                 logger.debug("Session ready, waiting for cleanup signal")
 
@@ -296,7 +301,7 @@ class ManagedClient:
     async def _run_sse_client(
         request: BridgeRequestBody,
         cleanup_event: asyncio.Event,
-        ready_future: asyncio.Future[ClientSession],
+        ready_future: asyncio.Future[SessionHandshake],
     ) -> None:
         """Run SSE transport client in dedicated task (deprecated)."""
         logger.warning("SSE transport is deprecated. Please migrate to Streamable HTTP.")
@@ -313,11 +318,11 @@ class ManagedClient:
             sse_read_timeout=SSE_READ_TIMEOUT_SECONDS,
         ) as (read, write):
             async with ClientSession(read, write, client_info=get_client_info()) as session:
-                # Initialize session
-                await asyncio.wait_for(session.initialize(), timeout=INIT_TIMEOUT_SECONDS)
+                # Initialize session, keeping what the handshake disclosed
+                instructions = await initialize_session(session, INIT_TIMEOUT_SECONDS)
 
                 # Signal ready
-                ready_future.set_result(session)
+                ready_future.set_result(SessionHandshake(session=session, instructions=instructions))
 
                 logger.debug("Session ready, waiting for cleanup signal")
 

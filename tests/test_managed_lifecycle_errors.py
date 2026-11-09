@@ -20,6 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from mcp_connect.client.instructions import SessionHandshake
 from src.mcp_connect.client.managed import ManagedClient
 from src.mcp_connect.models.request import BridgeRequestBody
 
@@ -330,7 +331,7 @@ async def test_spawn_waits_for_initialization(stdio_request):
         init_called = True
         # Simulate initialization delay
         await asyncio.sleep(0.01)
-        ready_future.set_result(mock_session)
+        ready_future.set_result(SessionHandshake(session=mock_session, instructions=None))
         # Wait for cleanup
         await cleanup_event.wait()
 

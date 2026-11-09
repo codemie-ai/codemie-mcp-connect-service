@@ -1,0 +1,70 @@
+{
+  "decision": "request-changes",
+  "rationale": "All three lenses ran. Acceptance audited the change against all 8 part-1 criteria and returned pass on every one, verifying each in source and tests rather than from the plan; it also corrected the ticket's count — there are 6 real initialize() call sites, the 7th was a docstring example at single_usage.py:68. Blind and edge-case independently converged on four actionable defects, two of them experimentally verified against the pinned mcp 1.28.1. The strongest is that the run's own recorded decision to do no sanitizing here is wrong at the trust boundary: this service, not the consumer, is what turns an arbitrary third-party server's bytes into a field the platform feeds to an LLM, and it caches that string for the whole session TTL. 4 findings emitted (all triage: patch). 1 finding deferred (cached instructions go stale for the cache TTL with no re-handshake path — worth a README note, not a blocker). 3 findings dismissed: the method-name .strip() guard (unreachable input, harmless), the missing debug log on the unknown-result fall-through (subsumed by CR-003's logging), and the blind lens's call for an env toggle to sequence rollout (it could not see that the sole consumer, the codemie backend's MCPListToolsResponse, ignores unknown fields, so no strict client breaks).",
+  "confidence": "high",
+  "risk_flags": ["security", "public-api"],
+  "business_review": [
+    {"criterion": "1. instructions captured at handshake, not discarded, at every call site", "status": "pass", "notes": "managed.py:253,289,326 and single_usage.py:147,212,285; repo-wide grep finds no uncaptured call"},
+    {"criterion": "2. stored next to the session, survives for the pooled session's lifetime, returned on tools/list", "status": "pass", "notes": "ManagedClient.instructions defaulted last field (managed.py:80), set at :136, cache stores the whole ManagedClient (manager.py:160-182), served at routes.py:207"},
+    {"criterion": "3. subsequent calls reuse the retrieved instructions, no re-derivation", "status": "pass", "notes": "cached branch reads the stored field; cache-HIT return at manager.py:168"},
+    {"criterion": "4. backward compatible for servers without instructions", "status": "pass", "notes": "helper returns the identical object when absent/blank (instructions.py:86-87); covered by test_attach_is_a_noop_without_instructions and test_tools_list_omits_instructions_when_the_server_sends_none; pre-existing suite passes untouched"},
+    {"criterion": "5. managed and single-usage emit identical JSON", "status": "pass", "notes": "both call the same helper on results from the same invoke_mcp_method, converging on one serializer at routes.py:302-306"},
+    {"criterion": "6. instructions on every page of paginated tools/list, no other method", "status": "pass", "notes": "guard keys on method alone, never inspects cursor (instructions.py:86-91); test_instructions_ride_every_page_of_a_paginated_listing plus two no-leak tests"},
+    {"criterion": "7. automated regression coverage incl. a real MCP server", "status": "pass", "notes": "tests/integration/test_real_server_instructions.py spawns a real FastMCP server; verified RED (KeyError) with the helper neutralized. See CR-004 — it is deselected from the default run"},
+    {"criterion": "8. key is exactly `instructions` at top level, documented", "status": "pass", "notes": "instructions.py:35,93,96; README.md:203-225 documents the additive contract"}
+  ],
+  "standards_review": [
+    {"standard": "git-workflow.md commit format EPMCDME-XXXX: <Imperative>", "status": "pass", "notes": "all 7 commits conform"},
+    {"standard": "security/README.md — no lock regeneration, security pins carry comments, gitleaks blocking gate", "status": "pass", "notes": "no dependency or lock change in the diff; gitleaks reports no leaks"},
+    {"standard": "development-practices.md — mandatory context7 lookup before implementing a library feature", "status": "pass", "notes": "context7 queried for the MCP Python SDK InitializeResult.instructions contract before implementation"},
+    {"standard": "quality-gates.md — all seven gates, manual (no CI in this repo)", "status": "pass", "notes": "poetry check --lock, ruff check, ruff format --check, mypy --strict (26 files), black --check, pytest 369 passed/1 deselected/92% coverage, make gitleaks"},
+    {"standard": "code-quality.md", "status": "na", "notes": "guide absent from .ai-run/guides/standards/"},
+    {"standard": "AGENTS.md:205 — /bridge response schema change is Ask-first", "status": "pass", "notes": "user explicitly approved the additive field; recorded in decisions.jsonl and to be stated in the MR description"}
+  ],
+  "findings": [
+    {
+      "id": "CR-001",
+      "title": "Third-party instruction text is relayed with no length cap or control-character stripping",
+      "problem": "attach_server_instructions checks only isinstance(str) and .strip() truthiness. Whatever the remote server returned at handshake is copied verbatim into the tools/list response — no maximum length, no control-character or ANSI stripping, no log of its size. On the pooled path the string is captured once and re-emitted on every tools/list for the whole cache TTL.",
+      "impact": "A hostile or compromised MCP server registered by any tenant can inject arbitrary prompt text into every downstream LLM system prompt that consumes the field, and can return a multi-megabyte string that this service caches and re-serialises on every tools/list page, inflating response size and downstream token cost with nothing in the logs to explain it.",
+      "recommendation": "Cap and normalize in attach_server_instructions before attaching: truncate to a configurable maximum (e.g. MCP_CONNECT_MAX_INSTRUCTIONS_CHARS, default a few KB, following the existing bare-os.getenv config pattern) and strip control characters, logging a warning with the original length when truncation fires. Escaping for prompt context stays with the consuming backend; a size ceiling and control-character strip at the trust boundary is not 'silently altering the payload'.",
+      "location": "src/mcp_connect/client/instructions.py:86-97",
+      "severity": "critical",
+      "triage": "patch",
+      "sources": ["blind", "edge-case"]
+    },
+    {
+      "id": "CR-002",
+      "title": "A server's own top-level `instructions` key on the tools/list result is silently overwritten",
+      "problem": "mcp.types.Result is extra=\"allow\", so the SDK preserves extra top-level keys a server puts on its tools/list result. Both helper branches assign unconditionally, replacing a server-supplied `instructions` with the handshake value. Verified on the pinned 1.28.1: ListToolsResult.model_validate({'tools': [], 'instructions': 'from-server', 'foo': 1}) comes back with instructions='from-handshake', foo untouched.",
+      "impact": "Data loss on the response contract, and a consumer cannot tell whether the value came from the handshake or from the list result. The bridge is a transparent proxy everywhere else; this is the one place it rewrites server-authored content, and the README describes the field as purely additive.",
+      "recommendation": "Do not overwrite an existing key: skip (logging a warning) when the result already carries a non-null `instructions`. If overwriting is ever intended, say so explicitly in the README instead of leaving it implied.",
+      "location": "src/mcp_connect/client/instructions.py:92-97",
+      "severity": "major",
+      "triage": "patch",
+      "sources": ["blind", "edge-case"]
+    },
+    {
+      "id": "CR-003",
+      "title": "Unguarded setattr on the SDK result can turn a successful tools/list into an HTTP 500",
+      "problem": "hasattr(result, \"model_dump\") is used as a proxy for 'pydantic model I may add a field to'. That holds only while the model is extra=\"allow\" and not frozen; on a frozen or extra=\"forbid\" model pydantic v2 raises ValueError. Both call sites sit inside a broad `except Exception` that maps anything to HTTP 500 (routes.py:224-238; single_usage.py:169-195/234-260/307-333). The docstring also claims dict results are copied while pydantic results are mutated in place, so the two branches have different aliasing semantics than documented.",
+      "impact": "Latent today because 1.28.1 is extra=\"allow\". After an SDK bump that tightens Result config, every tools/list on every transport returns 500 — the listing succeeded but the response is destroyed, and the cause is far from the symptom. The in-place mutation also stamps a result object the SDK may retain or share between concurrent requests on one pooled client.",
+      "recommendation": "Wrap the assignment in try/except (ValueError, TypeError, AttributeError), log a warning and return the untouched result; or use result.model_copy(update={\"instructions\": ...}) so both branches copy. Reconcile the docstring with whichever is chosen, and add a unit test passing a model with extra=\"forbid\" that asserts the result comes back unchanged.",
+      "location": "src/mcp_connect/client/instructions.py:95-98",
+      "severity": "major",
+      "triage": "patch",
+      "sources": ["blind", "edge-case"]
+    },
+    {
+      "id": "CR-004",
+      "title": "Tests cover 2 of 6 transport bodies, never the production pydantic path, and the only real-SDK assertion is deselected by default",
+      "problem": "Six initialize bodies changed (managed and single-usage x stdio/streamable-http/sse); the new tests exercise streamable-http only on each path. Every mocked /bridge test stubs list_tools to return a plain dict, taking the isinstance(dict) branch — a branch that never runs in production, where the SDK returns ListToolsResult. The one test using real SDK types is marked integration and pyproject sets addopts = \"-m 'not integration'\", so the default run deselects it; this repo has no CI to run it separately.",
+      "impact": "A future refactor reverting one of the four uncovered bodies to ready_future.set_result(session) — the exact 30-second-hang failure mode the technical analysis warned about — stays green. So does any regression in the route-level pydantic serialization that the whole backward-compatibility argument rests on.",
+      "recommendation": "Parametrize the managed and single-usage instruction tests over all three transports; change at least one /bridge test so the mocked session returns a real mcp.types.ListToolsResult; and either run the integration marker as a documented gate in quality-gates.md or move an equivalent real-types assertion into the default suite.",
+      "location": "tests/test_managed_instructions.py:46; tests/test_bridge_instructions.py:20; pyproject.toml:59",
+      "severity": "major",
+      "triage": "patch",
+      "sources": ["blind", "edge-case"]
+    }
+  ]
+}

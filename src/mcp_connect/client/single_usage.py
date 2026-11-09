@@ -34,6 +34,7 @@ from ..models.request import BridgeRequestBody
 from ..utils import apply_substitutions, mask_dict_values, mask_sensitive_headers
 from ..utils.logger import get_logger
 from .client_info import apply_user_agent_header, get_client_info
+from .instructions import attach_server_instructions, initialize_session
 
 # Reuse the shared transport context manager to avoid duplication
 from .transports import get_transport_ctx
@@ -146,8 +147,8 @@ async def _execute_stdio_request(
         # Simple SDK pattern - context managers handle all cleanup
         async with stdio_client(server_params) as (read, write):
             async with ClientSession(read, write, client_info=get_client_info()) as session:
-                # Initialize with timeout
-                await asyncio.wait_for(session.initialize(), timeout=INIT_TIMEOUT_SECONDS)
+                # Initialize with timeout, keeping what the handshake disclosed
+                instructions = await initialize_session(session, INIT_TIMEOUT_SECONDS)
 
                 # Import method invocation utility
                 from .methods import invoke_mcp_method
@@ -158,7 +159,7 @@ async def _execute_stdio_request(
                     timeout=timeout_sec,
                 )
 
-                return result
+                return attach_server_instructions(result, method, instructions)
 
     except asyncio.TimeoutError as exc:
         logger.error("Single-usage request timeout: method=%s, timeout=%0.1fs", method, timeout_sec)
@@ -212,8 +213,8 @@ async def _execute_http_request(
     try:
         async with get_transport_ctx(request, headers) as (read, write, *rest):
             async with ClientSession(read, write, client_info=get_client_info()) as session:
-                # Initialize with timeout
-                await asyncio.wait_for(session.initialize(), timeout=INIT_TIMEOUT_SECONDS)
+                # Initialize with timeout, keeping what the handshake disclosed
+                instructions = await initialize_session(session, INIT_TIMEOUT_SECONDS)
 
                 # Import method invocation utility
                 from .methods import invoke_mcp_method
@@ -224,7 +225,7 @@ async def _execute_http_request(
                     timeout=timeout_sec,
                 )
 
-                return result
+                return attach_server_instructions(result, method, instructions)
 
     except asyncio.TimeoutError as exc:
         logger.error("Single-usage request timeout: method=%s, timeout=%0.1fs", method, timeout_sec)
@@ -286,8 +287,8 @@ async def _execute_sse_request(
             sse_read_timeout=SSE_READ_TIMEOUT_SECONDS,
         ) as (read, write):
             async with ClientSession(read, write, client_info=get_client_info()) as session:
-                # Initialize with timeout
-                await asyncio.wait_for(session.initialize(), timeout=INIT_TIMEOUT_SECONDS)
+                # Initialize with timeout, keeping what the handshake disclosed
+                instructions = await initialize_session(session, INIT_TIMEOUT_SECONDS)
 
                 # Import method invocation utility
                 from .methods import invoke_mcp_method
@@ -298,7 +299,7 @@ async def _execute_sse_request(
                     timeout=timeout_sec,
                 )
 
-                return result
+                return attach_server_instructions(result, method, instructions)
 
     except asyncio.TimeoutError as exc:
         logger.error("Single-usage request timeout: method=%s, timeout=%0.1fs", method, timeout_sec)

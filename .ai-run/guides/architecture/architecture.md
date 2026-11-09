@@ -226,6 +226,7 @@ The MCP client manager detects transport type from request config and instantiat
 | `LOG_FORMAT` | Log format | json |
 | `MCP_CONNECT_INIT_TIMEOUT` | Client init timeout (ms) | 30000 |
 | `MCP_CONNECT_DEFAULT_TIMEOUT` | Method timeout (ms) | 120000 |
+| `MCP_CONNECT_MAX_INSTRUCTIONS_CHARS` | Max length of server `instructions` relayed on `tools/list` | 8192 |
 | `MCP_CONNECT_CLIENT_CACHE_TTL` | Cache TTL (ms) | 300000 |
 | `MCP_CONNECT_HTTP_TIMEOUT` | HTTP transport timeout (ms) | 30000 |
 | `MCP_CONNECT_SSE_READ_TIMEOUT` | SSE transport timeout (ms) | 300000 |

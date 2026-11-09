@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "task": "EPMCDME-14217 part 1 — capture the MCP initialize-handshake `instructions` string and expose it additively as a top-level `instructions` key on tools/list bridge responses.",
+  "generated": "2026-09-08",
+  "mode": "actual",
+  "dimensions": {
+    "component_scope":      { "score": 4, "label": "L" },
+    "requirements_clarity": { "score": 3, "label": "M" },
+    "technical_risk":       { "score": 4, "label": "L" },
+    "file_change_estimate": { "score": 5, "label": "XL" },
+    "dependencies":         { "score": 2, "label": "S" },
+    "affected_layers":      { "score": 3, "label": "M" }
+  },
+  "total": 21,
+  "size": "L",
+  "routing": "brainstorming",
+  "key_reasoning": [
+    {
+      "dimension": "component_scope",
+      "reason": "Four production components: a new client/instructions.py value object plus sanitizer, ManagedClient's lifecycle task, the single-usage executor's three transport bodies, and the server route handler. The change is not local to one call site — it retypes the lifecycle handshake channel (ready_future) that all three transports share, and alters the get_or_create_client return contract. Base M for a thin additive feature, bumped to L because it touches the shared client lifecycle contract."
+    },
+    {
+      "dimension": "technical_risk",
+      "reason": "No precedent in the codebase for carrying handshake-time data out of the lifecycle task, and the retyping had a silent failure mode: a missed declaration site or transport body yields a 30-second hang rather than a type error. The relayed text is third-party and lands in a downstream LLM system prompt, so instructions.py became a trust boundary needing a size cap and control-character strip — findings the code review surfaced rather than the plan. Offsetting factors: the change is additive, backward compatible and trivially reversible, and the repository has no CI, so all eight quality gates were run by hand."
+    },
+    {
+      "dimension": "file_change_estimate",
+      "reason": "14 real source files touched (6 new), spanning src/mcp_connect/client/, src/mcp_connect/server/, tests/, tests/integration/, plus README.md, .env.example and .ai-run/guides/quality-gates.md. Falls in the 11-15 modified / 4-6 new band. Note the profile is test-heavy: production code is roughly 230 lines across 4 files, while 5 of the 6 new files are tests. The 22-file diffstat figure is not used — 11 of those files and ~3900 lines are SDLC run artifacts under docs/superpowers/tasks/."
+    }
+  ],
+  "red_flags_applied": [
+    "Technical Risk bumped from M to L: security-sensitive trust boundary — server-supplied text is relayed into a downstream LLM prompt, requiring a size cap and control-character sanitization.",
+    "Component Scope bumped from M to L: touches a core shared contract — ready_future retyped from Future[ClientSession] to Future[SessionHandshake] across six declaration sites and three transport bodies, plus the get_or_create_client return shape."
+  ],
+  "split_recommendation": null,
+  "notes": "No initial complexity-assessment.json exists for comparison; this run used sdlc-light, which scores only at the end. The total of 21 sits at the very bottom of the L band, one point from M. Kept at L per the borderline rule: leaning lower requires Technical Risk of M or below with existing patterns covering more than half the implementation, and neither held — there was no existing pattern for handshake capture. Effort drivers not visible in the diff: a code-review round producing four findings (missing size cap and control-character strip, overwrite of a server-supplied key, unguarded pydantic setattr that could return 500, coverage gaps) and a fifth in the check round (docs contradicting the new behaviour); a cross-repo contract with a paired codemie backend MR; and manual execution of all quality gates because the repository has no CI. Affected Layers stayed at M (client/transport, API/server route, config-and-docs) — the cross-repo consumer is part 2 and not in this diff, though the /bridge response schema is a contract deployed clients depend on."
+}

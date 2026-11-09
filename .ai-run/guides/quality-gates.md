@@ -26,6 +26,7 @@ needed only to invoke a tool binary directly, without the `poetry run` prefix.
 | 5 | Format verify | `poetry run black --check src/ tests/` | yes | exit 0, all files unchanged |
 | 6 | Unit tests | `poetry run pytest tests/ --cov=src --cov-report=term-missing` | yes | exit 0, whole suite green, roughly 90s |
 | 7 | Secret scan | `make gitleaks` | yes | see § Secret scan |
+| 8 | Integration tests | `poetry run pytest tests/ -m integration` | yes | exit 0; the default run deselects this marker, and there is no CI, so it must be run by hand |
 
 **Pass** is exit 0 on every blocking gate. **Fail** is any non-zero exit — fix and re-run the
 gate that failed, then re-run the rest.
@@ -75,6 +76,8 @@ without conflict. `--check` reports without writing; `poetry run black src/ test
 
 Roughly 90 seconds. `addopts = "-m 'not integration'"` in `pyproject.toml` means the
 plain invocation already excludes the integration marker; you do not need to pass `-m` yourself.
+That exclusion is why gate 8 exists: the integration tests are real coverage that this gate
+never runs, and no CI runs them either.
 
 **Fail** → fix the code or the test. A test deleted or weakened to make the gate pass has failed
 the gate.
@@ -104,7 +107,7 @@ trap is real; the observed value is in the table.
 
 | Command | What actually happens |
 |---|---|
-| `poetry run pytest tests/ -m integration` | **exit 5** — every test deselected, none selected. `tests/integration/` holds only `__init__.py` and no test carries `@pytest.mark.integration`. Integration coverage is absent, not passing. |
+| `poetry run pytest tests/ -m integration` | Since EPMCDME-14217 this selects real coverage (`tests/integration/test_real_server_instructions.py`) and is gate 8. It exited 5 — deselect-everything — only while `tests/integration/` was an empty scaffold. Exit 5 now means the marker stopped matching, not that it passed. |
 | `poetry run pip-licenses --allow-only=...` | **exit 1** on `filelock` (Unlicense), a dev dependency. The allow list in `pyproject.toml` `[tool.pip-licenses]` governs shipped dependencies; scope the run before treating a failure as real. |
 | `poetry run pre-commit run --all-files` | No `.pre-commit-config.yaml` exists in the repository. The framework is installed and has nothing to execute. |
 

@@ -59,6 +59,9 @@ def mock_mcp_client():
     mock_handle = MagicMock()
     mock_handle.session = session
     mock_handle.cleanup = AsyncMock(return_value=None)
+    # A real ManagedClient carries this; without it MagicMock
+    # would auto-create a non-serializable attribute.
+    mock_handle.instructions = None
 
     # Mock both cached and single-usage paths
     with (
