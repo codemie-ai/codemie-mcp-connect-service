@@ -308,6 +308,19 @@ COPY --chown=root:root --chmod=644 uv-constraints.txt /etc/uv-constraints.txt
 # Copy startup script that runs Uvicorn (owned by root)
 COPY --chown=root:root --chmod=755 start.sh /usr/local/bin/start.sh
 
+# Security (EPMCDME-17441): disable the Base64 intrinsic to mitigate CVE-2026-114938 (Java4Shell) in JDK 17/21
+# A wrapper is used instead of JAVA_TOOL_OPTIONS because stdio MCP servers are spawned with a whitelisted
+# environment (HOME, LOGNAME, PATH, SHELL, TERM, USER) and would not inherit it.
+# The flag is passed without IgnoreUnrecognizedVMOptions so a wrong flag name fails the build.
+# TODO: Remove once Temurin 17.0.21.1+ and 21.0.13.1+ are GA and the JDK pins are bumped
+COPY --chown=root:root --chmod=755 java-wrapper.sh /tmp/java-wrapper.sh
+RUN for jdk in /usr/lib/jvm/jdk-17 /usr/lib/jvm/jdk-21; do \
+        "${jdk}/bin/java" -XX:-UseBASE64Intrinsics -version && \
+        mv "${jdk}/bin/java" "${jdk}/bin/java.real" && \
+        install -m 755 /tmp/java-wrapper.sh "${jdk}/bin/java"; \
+    done && \
+    rm /tmp/java-wrapper.sh
+
 # Set permissions for codemie user (application code remains root-owned to prevent runtime modification)
 RUN chmod -R o+rX /codemie /usr/lib/jvm "${MAVEN_HOME}"
 
