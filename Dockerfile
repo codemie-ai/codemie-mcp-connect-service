@@ -146,7 +146,7 @@ RUN mkdir -p /tmp/be-fix && \
     rm -rf /tmp/be-fix
 
 # Install Maven
-ENV MAVEN_VERSION=3.9.16
+ENV MAVEN_VERSION=3.10.1
 ENV MAVEN_HOME=/opt/apache-maven-${MAVEN_VERSION}
 
 RUN curl -Lso "/tmp/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
