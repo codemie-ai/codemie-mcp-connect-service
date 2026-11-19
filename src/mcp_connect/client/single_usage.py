@@ -33,6 +33,7 @@ from mcp.client.stdio import stdio_client
 from ..models.request import BridgeRequestBody
 from ..utils import apply_substitutions, mask_dict_values, mask_sensitive_headers
 from ..utils.logger import get_logger
+from ..utils.workspace import server_cwd
 from .client_info import apply_user_agent_header, get_client_info
 from .instructions import attach_server_instructions, initialize_session
 
@@ -141,6 +142,7 @@ async def _execute_stdio_request(
         command=command,
         args=args,
         env=env,
+        cwd=server_cwd(),
     )
 
     try:

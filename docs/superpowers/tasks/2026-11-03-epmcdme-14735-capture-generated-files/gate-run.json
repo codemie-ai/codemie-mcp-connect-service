@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "branch": "EPMCDME-14735_capture-generated-files",
+  "head": "105c8621ecb1ea1698c14d5278f9e9f52ad9e84e",
+  "runner": "poetry",
+  "started_at": "2026-11-04T14:20:03Z",
+  "completed_at": "2026-11-04T14:22:37Z",
+  "status": "PASSED",
+  "drift_detected": false,
+  "gates": [
+    {
+      "id": "lock",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 415,
+      "command": "poetry check --lock",
+      "exit_code": 0
+    },
+    {
+      "id": "format",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 403,
+      "command": "poetry run ruff format",
+      "exit_code": 0,
+      "notes": "Mutating gate (non-blocking). It reformatted tests/test_export_apply.py (2 insertions, 1 deletion), left uncommitted in the working tree; head in this file is the last commit, not including that change."
+    },
+    {
+      "id": "lint",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 346,
+      "command": "poetry run ruff check",
+      "exit_code": 0
+    },
+    {
+      "id": "typecheck",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 597,
+      "command": "poetry run mypy src/",
+      "exit_code": 0
+    },
+    {
+      "id": "format-verify",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 579,
+      "command": "poetry run black --check src/ tests/",
+      "exit_code": 0
+    },
+    {
+      "id": "unit",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 92794,
+      "command": "poetry run pytest tests/ --cov=src --cov-report=term-missing",
+      "exit_code": 0,
+      "notes": "465 passed, total coverage 93%"
+    },
+    {
+      "id": "secrets",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 9982,
+      "command": "make gitleaks",
+      "exit_code": 0,
+      "notes": "no leaks found (containerized gitleaks v8.30.0)"
+    }
+  ],
+  "failures": {}
+}

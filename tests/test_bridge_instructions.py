@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -154,3 +156,70 @@ async def test_real_sdk_result_without_instructions_is_byte_identical(
     )
 
     assert response.json() == {"tools": []}
+
+
+async def test_export_opted_in_stdio_tools_list_carries_instructions_and_export_param(
+    async_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """EPMCDME-14735 x EPMCDME-14217: export.apply sees the result after instructions are attached."""
+    from mcp.types import ListToolsResult, Tool
+
+    from mcp_connect.client.export import EXPORT_PARAM, SWITCH_KEY
+
+    handle = MagicMock()
+    handle.instructions = "Call with sysparm_help=true first."
+    tool = Tool(name="gen", inputSchema={"type": "object", "properties": {"a": {"type": "string"}}})
+    session = _session_returning(ListToolsResult(tools=[tool]))
+    monkeypatch.setattr(
+        "mcp_connect.server.routes.get_or_create_client",
+        AsyncMock(return_value=(handle, session)),
+    )
+
+    response = await async_client.post(
+        "/bridge",
+        json={"serverPath": "some-stdio-server", "method": "tools/list", "params": {}, "env": {SWITCH_KEY: "true"}},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["instructions"] == "Call with sysparm_help=true first."
+    assert EXPORT_PARAM in body["tools"][0]["inputSchema"]["properties"]
+    uuid.UUID(response.headers["X-Request-ID"])  # CR-004: the export path keeps the tracing header
+
+
+async def test_export_tools_call_keeps_request_id_header(
+    async_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """CR-004: a tools/call that exports a file still carries X-Request-ID."""
+    from mcp.types import CallToolResult, TextContent
+
+    from mcp_connect.client import export
+    from mcp_connect.utils import workspace
+
+    monkeypatch.setattr(workspace, "SERVER_CWD", str(tmp_path.resolve()))
+    root = workspace.user_root("u1")
+    assert root is not None
+    Path(root).mkdir(parents=True)
+    target = Path(root) / "a.txt"
+    target.write_bytes(b"1")
+    session = MagicMock()
+    session.call_tool = AsyncMock(return_value=CallToolResult(content=[TextContent(type="text", text="ok")]))
+    monkeypatch.setattr(
+        "mcp_connect.server.routes.get_or_create_client",
+        AsyncMock(return_value=(MagicMock(instructions=None), session)),
+    )
+
+    response = await async_client.post(
+        "/bridge",
+        json={
+            "serverPath": "some-stdio-server",
+            "method": "tools/call",
+            "user_id": "u1",
+            "params": {"name": "gen", "arguments": {export.EXPORT_PARAM: [str(target)]}},
+            "env": {export.SWITCH_KEY: "true"},
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["content"][1]["type"] == "resource"
+    uuid.UUID(response.headers["X-Request-ID"])

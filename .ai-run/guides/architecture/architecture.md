@@ -230,6 +230,19 @@ The MCP client manager detects transport type from request config and instantiat
 | `MCP_CONNECT_CLIENT_CACHE_TTL` | Cache TTL (ms) | 300000 |
 | `MCP_CONNECT_HTTP_TIMEOUT` | HTTP transport timeout (ms) | 30000 |
 | `MCP_CONNECT_SSE_READ_TIMEOUT` | SSE transport timeout (ms) | 300000 |
+| `MCP_CONNECT_EXPORT_MAX_FILE_BYTES` | Max bytes per exported file | 52428800 |
+| `MCP_CONNECT_EXPORT_MAX_CALL_BYTES` | Max exported bytes per call | 52428800 |
+| `MCP_CONNECT_EXPORT_MAX_FILES` | Max exported files per call | 20 |
+| `MCP_CONNECT_EXPORT_MAX_LINKS` | Max `resource_link` items resolved per call | 50 |
+| `MCP_CONNECT_EXPORT_MAX_INFLIGHT_BYTES` | Pod-wide in-flight export budget | 52428800 |
+
+**File export links (`resource_link`)**: on an opted-in stdio server, `export.apply` reads each `file:///` `resource_link` of a successful `tools/call` result and replaces it in place with the embedded file, under the same limits as model-named paths (explicit files first, then links in content order, one shared budget).
+- Same `CODEMIE_EXPORT_FILES` switch, no new one: servers already opted in gain link reading on deploy.
+- Root is per user: `export.prepare` sets `ExportContext.root` to `user_root(request.user_id)` (`/home/codemie/u-<sha256[:16]>`); no `user_id` means nothing is read. The `tools/list` description names no folder because the backend caches it across users.
+- Trust: the server names the files itself, so opt in only servers whose output you trust; a stdio proxy to a remote server does not meet this.
+- The server must return the link after the file is complete; a file still being written is delivered as it is.
+- A refused or unreadable link becomes one text note at its position; a link to a file already delivered in the call is dropped silently.
+- `isError` results and non-opted-in or non-stdio servers are left untouched. Full semantics: `README.md`.
 
 **Evidence**: `AGENTS.md`, `CLAUDE.md`
 

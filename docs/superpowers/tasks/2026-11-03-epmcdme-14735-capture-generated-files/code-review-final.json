@@ -1,0 +1,245 @@
+{
+  "schema": "sdlc-factory/code-review-final@1",
+  "passed": true,
+  "decision": "approve",
+  "gate_decision": {
+    "gate": "code-review.check",
+    "decision": "approve",
+    "source": "hitl",
+    "rationale": "Check round approved; CR-001..003 resolved"
+  },
+  "gates": [
+    {
+      "gate": "code-review.final",
+      "decision": "request-changes",
+      "source": "hitl",
+      "rationale": "User chose fix-up for CR-001..003"
+    },
+    {
+      "gate": "code-review.check",
+      "decision": "approve",
+      "source": "hitl",
+      "rationale": "Check round approved; CR-001..003 resolved"
+    }
+  ],
+  "reviewed_head": "105c8621ecb1ea1698c14d5278f9e9f52ad9e84e",
+  "rounds": [
+    "final",
+    "check"
+  ],
+  "rationale": "All 3 prior blocking findings verified resolved against current source: basename now taken from the normalized path, collect_exports releases earlier reservations on any BaseException and NUL paths are refused, and cancellation/failed-future release tests were added. No deferred findings re-checked.",
+  "confidence": "high",
+  "check_confidence": "high",
+  "risk_flags": [
+    "security",
+    "data-contract",
+    "public-api"
+  ],
+  "open": 0,
+  "closed": {
+    "fixed": 3,
+    "moot": 0,
+    "decided": 0,
+    "wont_fix": 0
+  },
+  "findings": [
+    {
+      "id": "CR-001",
+      "kind": "code",
+      "severity": "major",
+      "triage": "patch",
+      "file": "src/mcp_connect/client/export.py",
+      "line": 200,
+      "title": "Trailing-slash export path yields empty resource name",
+      "problem": "A listed path such as 'report.csv/' passes _check_path (normpath strips the slash) and opens fine, but name = os.path.basename(given) is empty. The resource gets uri 'file:///', an empty filename, octet-stream mime, and the skip_names dedupe against server-returned resources is bypassed.",
+      "impact": "The user receives a nameless download for a file the model correctly named; duplicates of server-returned resources are not suppressed.",
+      "recommendation": "Derive the name from the normalized path: name = os.path.basename(p).",
+      "status": "resolved",
+      "check_notes": "export.py:211 name = os.path.basename(p) from normalized path; test_trailing_slash_path_keeps_its_name covers uri and skip_names dedupe",
+      "fix": {
+        "change": "resource name derived from the normalized path (basename(p))",
+        "test": "tests/test_export_collect.py::test_trailing_slash_path_keeps_its_name"
+      }
+    },
+    {
+      "id": "CR-002",
+      "kind": "code",
+      "severity": "critical",
+      "triage": "patch",
+      "file": "src/mcp_connect/client/export.py",
+      "line": 251,
+      "title": "Budget reservations leak on non-OSError in collect_exports",
+      "problem": "The loop catches only OSError. Any other exception after a file was reserved (ValueError from a NUL byte in a path via realpath/os.open, MemoryError in b64encode/join, pydantic ValidationError) releases only the current file's reserved_here; earlier files' bytes in out.reserved are lost with the discarded Collected. _export_call and _release_when_done also release nothing when the future raised.",
+      "impact": "Each occurrence permanently shrinks the pod-wide MAX_INFLIGHT_BYTES until restart, eventually refusing every export as 'busy'; a NUL-byte path also turns the whole call into a 500 after the tool already ran. Violates AC7 (reservation released in a finally).",
+      "recommendation": "Wrap the loop in try/except BaseException that calls release(out.reserved) and re-raises; refuse paths containing NUL in _check_path. Add tests for a NUL path after a good file and an injected mid-loop failure, asserting export._inflight == 0.",
+      "status": "resolved",
+      "check_notes": "NUL refused in _check_path (170); collect_exports wraps _collect_into in except BaseException that releases out.reserved and re-raises (195-199); per-file finally still releases reserved_here, no double release; tests cover NUL after good file and MemoryError mid-loop with _inflight == 0",
+      "fix": {
+        "change": "NUL paths refused in _check_path; collect_exports releases out.reserved and re-raises on any exception",
+        "test": "tests/test_export_collect.py::test_nul_byte_path_refused_after_good_file, test_mid_loop_failure_releases_earlier_reservations"
+      }
+    },
+    {
+      "id": "CR-003",
+      "kind": "code",
+      "severity": "major",
+      "triage": "patch",
+      "file": "tests/test_export_apply.py",
+      "title": "No test for cancellation during export collection",
+      "problem": "The only path returning the reservation when the request is cancelled mid-collection is the _release_when_done done-callback in _export_call. No test cancels apply() while collect_exports runs; existing budget tests cover only send-completes, send-raises and construction-raises.",
+      "impact": "If the cancel branch or callback regresses (inverted exception check, wrong attribute), every client disconnect during export leaks pod-wide budget and later exports are refused as busy, with all tests still green.",
+      "recommendation": "Add an async test: monkeypatch export.collect_exports with a blocking function that calls export._reserve(n) and returns Collected(reserved=n); cancel the apply task mid-flight, let the thread finish, assert export._inflight == 0. Also assert _release_when_done is a no-op when the future raised or was cancelled.",
+      "status": "resolved",
+      "check_notes": "test_budget_released_when_cancelled_during_collection and test_release_when_done_ignores_failed_or_cancelled_future added; cancel path in _export_call (shield + done-callback) matches test; autouse fixture resets _inflight",
+      "fix": {
+        "change": "tests only: cancellation mid-collection and _release_when_done no-op cases",
+        "test": "tests/test_export_apply.py::test_budget_released_when_cancelled_during_collection, test_release_when_done_ignores_failed_or_cancelled_future"
+      }
+    }
+  ],
+  "deferred": [],
+  "coverage_graded_at": "final",
+  "business_review": [
+    {
+      "kind": "spec",
+      "item": "AC1: opted-in stdio tools/list adds optional codemie_export_files array to every tool, never required",
+      "status": "pass",
+      "notes": "apply() setdefault per tool; required untouched; tested"
+    },
+    {
+      "kind": "spec",
+      "item": "AC2: tools/call strips codemie_export_files on every stdio call, opted in or not",
+      "status": "pass",
+      "notes": "prepare() pops EXPORT_PARAM on stdio tools/call regardless of opt-in; tested"
+    },
+    {
+      "kind": "spec",
+      "item": "AC3: real model, Filesystem server opted in, brief prompt shows chips in 4 of 5 runs",
+      "status": "pending-stage-7",
+      "notes": "implementation present; real-model run rates remain"
+    },
+    {
+      "kind": "spec",
+      "item": "AC4: real model, shell server opted in, RADAR prompt returns xlsx/csv/json chips in 4 of 5 runs",
+      "status": "pending-stage-7",
+      "notes": "workdir resolution present; real-model run rates remain"
+    },
+    {
+      "kind": "spec",
+      "item": "AC5: xlsx, csv, json, zip, pdf get correct mimeTypes",
+      "status": "pass",
+      "notes": "_MIME_OVERRIDES; test_mime_types"
+    },
+    {
+      "kind": "spec",
+      "item": "AC6: outside root, ../, symlink, hidden, FIFO, directory, missing are refused and listed",
+      "status": "pass",
+      "notes": "_check_path + collect_exports; tests per case"
+    },
+    {
+      "kind": "spec",
+      "item": "AC7: over per-file/per-call/count/budget limits are listed; budget reservation released even when send fails",
+      "status": "partial",
+      "notes": "send-failure release works; reservations lost if collect_exports raises non-OSError mid-loop (CR-002)"
+    },
+    {
+      "kind": "spec",
+      "item": "AC8: without CODEMIE_EXPORT_FILES true there is no injection and no export; key never reaches child env",
+      "status": "pass",
+      "notes": "switch popped from env copy; apply gated on ctx.enabled; tested"
+    },
+    {
+      "kind": "spec",
+      "item": "AC9: HTTP and SSE tools/list and tools/call results byte-identical to today",
+      "status": "pass",
+      "notes": "apply() falls through to same JSONResponse dump; tested"
+    },
+    {
+      "kind": "spec",
+      "item": "AC10: server content byte-identical; absent/null/[] unchanged; isError adds only skip item",
+      "status": "pass",
+      "notes": "tested for nothing-requested, error with and without request"
+    },
+    {
+      "kind": "spec",
+      "item": "AC11: export reaches nothing the server could not already read; second user needs exact path",
+      "status": "pass",
+      "notes": "no listing; README states same-uid residual"
+    },
+    {
+      "kind": "spec",
+      "item": "AC12: real model delivers an earlier-turn file as a chip",
+      "status": "pending-stage-7",
+      "notes": "mechanism present; real-model run remains"
+    },
+    {
+      "kind": "spec",
+      "item": "Opt-in values true/1/yes/on, any case, string or JSON boolean; stdio only",
+      "status": "pass",
+      "notes": "_TRUE_VALUES; test_switch_true_values"
+    },
+    {
+      "kind": "spec",
+      "item": "Invalid export value refused with a note and the call still runs",
+      "status": "pass",
+      "notes": "test_invalid_value_gives_one_note"
+    },
+    {
+      "kind": "spec",
+      "item": "Constraint: one export module hooked twice in bridge_endpoint; invoke_mcp_method unchanged",
+      "status": "pass",
+      "notes": "routes.py calls prepare then apply"
+    },
+    {
+      "kind": "spec",
+      "item": "Constraint: file access in one function, encoding and rendering off the event loop",
+      "status": "pass",
+      "notes": "to_thread for collect and response construction"
+    },
+    {
+      "kind": "spec",
+      "item": "Constraint: shared constants build the model-facing description",
+      "status": "pass",
+      "notes": "_PARAM_SCHEMA built from EXPORT_ROOT and WORKDIR_ARG_NAMES"
+    },
+    {
+      "kind": "spec",
+      "item": "Limits configurable through env vars and documented",
+      "status": "pass",
+      "notes": "four MCP_CONNECT_EXPORT_* vars; README and architecture.md"
+    },
+    {
+      "kind": "spec",
+      "item": "README documents opt-in, not-an-access-control, known behavior, instruction line",
+      "status": "pass",
+      "notes": "README export section"
+    }
+  ],
+  "standards_review": [
+    {
+      "kind": "commit-format",
+      "status": "pass",
+      "notes": "4 subjects in range all start with the EPMCDME-14735: ticket prefix followed by an imperative description, matching the documented EPMCDME-XXXX: format in git-workflow.md"
+    },
+    {
+      "kind": "code-quality",
+      "status": "na",
+      "notes": "no .ai-run/guides/standards/code-quality.md in the repo and no ref passed; absent standard, not a gap"
+    },
+    {
+      "kind": "security",
+      "status": "na",
+      "notes": "no .ai-run/guides/development/security-patterns.md in the repo and no ref passed; absent standard. Independently inspected src/mcp_connect/client/export.py path handling (dotdot rejection, realpath/symlink check, O_NOFOLLOW open, EXPORT_ROOT containment, hidden-path refusal, size and budget limits) and saw no concrete security defect, no credential logging"
+    }
+  ],
+  "final_round": {
+    "decision": "request-changes",
+    "rationale": "AC7 is only partly met: a non-OSError mid-collect (e.g. NUL byte in a path) permanently leaks the in-flight byte budget and 500s the call; cancellation release is untested and a trailing-slash path exports with an empty name. 16 candidates dismissed as noise or accepted by spec (same-uid race, opt-in via request env, config parsing); 0 deferred.",
+    "confidence": "high",
+    "risk_flags": [
+      "security",
+      "data-contract",
+      "public-api"
+    ]
+  }
+}

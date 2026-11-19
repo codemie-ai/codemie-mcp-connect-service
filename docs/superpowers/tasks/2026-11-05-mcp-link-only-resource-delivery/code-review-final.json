@@ -1,0 +1,268 @@
+{
+  "schema": "sdlc-factory/code-review-final@1",
+  "passed": true,
+  "decision": "approve",
+  "gate_decision": {
+    "gate": "code-review.check",
+    "decision": "approve",
+    "source": "hitl",
+    "rationale": "Check round approved CR-001..004 resolved; user requested an extra full-profile review of fix-up + MR note 2513257 fix (approve, 0 findings, round3.local). 5 older pushed commit subjects >72 chars left unrewritten (force-push not done)."
+  },
+  "gates": [
+    {
+      "gate": "code-review.final",
+      "decision": "request-changes",
+      "source": "hitl",
+      "rationale": "User chose request-changes: fix CR-001..CR-003 in one fix-up round; CR-004 (commit subject length) likely not fixable without history rewrite."
+    },
+    {
+      "gate": "code-review.check",
+      "decision": "approve",
+      "source": "hitl",
+      "rationale": "Check round approved CR-001..004 resolved; user requested an extra full-profile review of fix-up + MR note 2513257 fix (approve, 0 findings, round3.local). 5 older pushed commit subjects >72 chars left unrewritten (force-push not done)."
+    }
+  ],
+  "reviewed_head": "b98e80fc899c0952917564483c5bd7727825bc54",
+  "rounds": [
+    "final",
+    "check"
+  ],
+  "rationale": "All 4 prior blocking findings resolved: CR-001..003 confirmed in current source/tests, CR-004 via id-mapped command record bound to HEAD c14e714 (exit 0, no artifact; the 0-count is self-asserted since the pipeline ends in wc, hence medium confidence). DF-001 deferred, not re-checked; tests were not executed by this verifier.",
+  "confidence": "high",
+  "check_confidence": "medium",
+  "risk_flags": [
+    "security"
+  ],
+  "open": 0,
+  "closed": {
+    "fixed": 4,
+    "moot": 0,
+    "decided": 0,
+    "wont_fix": 0
+  },
+  "findings": [
+    {
+      "id": "CR-001",
+      "kind": "code",
+      "severity": "critical",
+      "triage": "patch",
+      "file": ".ai-run/guides/architecture/architecture.md",
+      "line": 229,
+      "title": "architecture.md omits link delivery semantics",
+      "problem": "The spec requires README and architecture.md to state link semantics (same switch, already opted-in servers gain link reading on deploy, stdio proxy trust sentence, link read after the file is complete). architecture.md only gained MCP_CONNECT_EXPORT_* env rows (lines 232-236); README carries all points.",
+      "impact": "Required spec documentation criterion is partial; operators reading the architecture guide miss that existing opted-in servers now get link resolution on deploy.",
+      "recommendation": "Add the link semantics to the file-export section of architecture.md, mirroring the README wording.",
+      "status": "resolved",
+      "check_notes": "architecture.md now states same switch, gained on deploy, trust sentence, link after file complete",
+      "fix": {
+        "change": "architecture.md: added file-export links subsection (same switch, gained on deploy, trust, link after file complete)",
+        "test": "n/a"
+      }
+    },
+    {
+      "id": "CR-002",
+      "kind": "code",
+      "severity": "major",
+      "triage": "patch",
+      "file": "src/mcp_connect/client/export.py",
+      "line": 497,
+      "title": "Apply-level dup link outcome is untested",
+      "problem": "In _export_call a LinkOutcome of kind 'dup' falls through both branches, so the resource_link is removed with no replacement. Only collect_exports outcomes are asserted (test_link_to_delivered_path_is_dup, test_two_links_to_one_path_give_one_item); no apply/route test covers an explicit path plus a link to it, or two links to one path.",
+      "impact": "A regression that leaves the raw resource_link, emits a note or double-attaches the file would pass every current test, and the README promise ships unverified at the response boundary.",
+      "recommendation": "Add apply-level tests: write a.txt, call export.apply(_ctx(['a.txt']), _linked(_link(root / 'a.txt')), {}) and assert content is the two text items plus one resource a.txt (no resource_link, no note, no second chip); likewise two links to one path give exactly one resource at the first link position.",
+      "status": "resolved",
+      "check_notes": "apply-level tests added for explicit path plus link and two links to one path",
+      "fix": {
+        "change": "added apply-level tests for explicit-path+link and two-links-one-path",
+        "test": "tests/test_export_apply.py::test_link_to_explicit_path_is_removed_silently, ::test_two_links_to_one_path_give_one_resource_at_first_link"
+      }
+    },
+    {
+      "id": "CR-003",
+      "kind": "code",
+      "severity": "critical",
+      "triage": "patch",
+      "file": "tests/test_export_links.py",
+      "line": 48,
+      "title": "L3 normalisation test lacks outcome assertions",
+      "problem": "Spec L3 requires, per SDK-built ResourceLink form, the observed normalised string AND the resulting outcome. TestAnyUrlNormalisation.test_sdk_link_dump asserts only the dumped string; test_raw_dict_link_keeps_exact_string checks one form and opens with a tautology (raw['uri'] == uri). Accepted-after-normalisation cases such as file://localhost/... are unasserted, while the raw-dict TestExtractLinks refuses them.",
+      "impact": "Production feeds extract_links the SDK-normalised string, so what it actually accepts or refuses per form is unverified; a change in AnyUrl normalisation or _link_path would go unnoticed.",
+      "recommendation": "For each form assert the extract_links outcome of the normalised string (accepted path or refusal reason) alongside the dumped string; keep raw-dict refusal cases for every form and remove the tautological assertion.",
+      "status": "resolved",
+      "check_notes": "CASES carry sdk and raw outcomes, asserted via extract_links; tautology removed; reason strings match export.py constants",
+      "fix": {
+        "change": "normalisation table now asserts extract_links outcome for SDK-dumped and raw-dict strings per form; removed tautology",
+        "test": "tests/test_export_links.py::TestAnyUrlNormalisation"
+      }
+    },
+    {
+      "id": "CR-004",
+      "kind": "evidence",
+      "severity": "major",
+      "triage": "patch",
+      "file": "unknown",
+      "title": "Commit subjects exceed 72 characters",
+      "problem": "development-practices.md documents EPMCDME-xxx: subjects under 72 chars; 8 of 16 branch commits exceed it (73 to 101 chars), including 'Fix export review findings (trailing-slash name, budget release on error, cancel test)' (101) and 'Add explicit file export module with prepare/apply hooks in /bridge' (82), which also packs unrelated fixes.",
+      "impact": "Breaks the documented commit-format standard and the one-logical-change rule in git-workflow.md.",
+      "recommendation": "Shorten subjects to under 72 chars (e.g. 'EPMCDME-14735: Fix export review findings') with detail in the body; the MR is squash-merged, so the squash subject can carry the fix.",
+      "status": "resolved",
+      "check_notes": "Command record bound to HEAD, exit 0; reflog shows filter-branch rewrite; count result self-asserted, not independently verified",
+      "evidence": {
+        "commands": [
+          {
+            "command": "git log --format=%s origin/EPMCDME-14735_capture-generated-files..HEAD | awk 'length>72' | wc -l  (prints 0)",
+            "exit_code": 0,
+            "head": "c14e714263500dc9c4046036767b788eca454440"
+          }
+        ]
+      }
+    }
+  ],
+  "deferred": [
+    {
+      "id": "DF-001",
+      "severity": "major",
+      "file": "src/mcp_connect/client/export.py",
+      "line": 314,
+      "title": "Explicit export drops skip_names and same-basename paths silently",
+      "problem": "Explicit paths with a basename in skip_names are skipped with no note, and two explicit paths with one basename from different folders both attach as file:///name; README says nothing is dropped silently.",
+      "preexisting": "Explicit-path export predates the link task (commit 0dad345); this task covers resource_link delivery only."
+    }
+  ],
+  "coverage_graded_at": "final",
+  "business_review": [
+    {
+      "kind": "spec",
+      "item": "Seam (AR-1): per-link step over per-call state; collect_exports keeps its signature; apply runs one shielded job",
+      "status": "partial",
+      "notes": "Per-link step and shielded job exist; collect_exports gained an optional links parameter (backward compatible)"
+    },
+    {
+      "kind": "spec",
+      "item": "One budget: explicit files first, then links in content order, one byte total, one count, one reservation",
+      "status": "pass",
+      "notes": "_collect_into runs paths then links over one _State"
+    },
+    {
+      "kind": "spec",
+      "item": "Docs: README and architecture.md state link semantics (same switch, gained on deploy, trust sentence, link after file complete)",
+      "status": "partial",
+      "notes": "README complete; architecture.md only adds MCP_CONNECT_EXPORT_* env rows"
+    },
+    {
+      "kind": "spec",
+      "item": "L1. Opted-in stdio server link becomes embedded resource with file:///<name>, mimeType, base64 blob",
+      "status": "pass",
+      "notes": "unit and e2e tests"
+    },
+    {
+      "kind": "spec",
+      "item": "L2. Single-use and cached paths deliver an existing file; removed file gives not found note",
+      "status": "pass",
+      "notes": "e2e parametrized"
+    },
+    {
+      "kind": "spec",
+      "item": "L3. SDK ResourceLink per form: test asserts normalised string AND outcome; raw dict keeps exact string",
+      "status": "partial",
+      "notes": "TestAnyUrlNormalisation asserts only dumped string; raw-dict test has a tautological assert"
+    },
+    {
+      "kind": "spec",
+      "item": "L4. Link outside root, via symlink, hidden, or non-regular file is not read and becomes one note",
+      "status": "pass",
+      "notes": "test_bad_links_each_get_a_note_rest_intact"
+    },
+    {
+      "kind": "spec",
+      "item": "L5. Declared/actual size and call/count/pod limits give a note, no retry; budget released on send failure",
+      "status": "pass",
+      "notes": "covered by link limit and release tests"
+    },
+    {
+      "kind": "spec",
+      "item": "L6. Explicit export plus links: explicit first; link to delivered path removed with no note",
+      "status": "pass",
+      "notes": "collect-level tested; apply-level dup untested (CR-002)"
+    },
+    {
+      "kind": "spec",
+      "item": "L7. Read failure leaves the rest intact; link becomes a note naming file and reason",
+      "status": "pass",
+      "notes": "test_link_read_error_is_noted"
+    },
+    {
+      "kind": "spec",
+      "item": "L8. isError result with a link is byte-identical to today",
+      "status": "pass",
+      "notes": "test_error_result_with_link"
+    },
+    {
+      "kind": "spec",
+      "item": "L9. Non-opted-in or non-stdio servers: result with a link byte-identical",
+      "status": "pass",
+      "notes": "test_link_disabled_or_http_not_modified"
+    },
+    {
+      "kind": "spec",
+      "item": "L10. Results with no link, including explicit-export calls returning none, byte-identical",
+      "status": "pass",
+      "notes": "test_nothing_requested_is_byte_identical"
+    },
+    {
+      "kind": "spec",
+      "item": "L11. Links read only from the tool result; arguments and other text supply none",
+      "status": "pass",
+      "notes": "test_other_items_ignored"
+    },
+    {
+      "kind": "spec",
+      "item": "L12. Purpose-built stdio test server returns SDK-typed links end-to-end against /bridge",
+      "status": "pass",
+      "notes": "tests/fixtures/link_server.py, test_export_links_e2e.py"
+    },
+    {
+      "kind": "spec",
+      "item": "L13. Cancelling during a link read releases the whole reservation",
+      "status": "pass",
+      "notes": "test_link_budget_released_when_cancelled_during_collection"
+    },
+    {
+      "kind": "spec",
+      "item": "L14. Same-named links in different folders: first delivered, second a note; two links to one path give one item",
+      "status": "pass",
+      "notes": "collision and e2e tests"
+    },
+    {
+      "kind": "spec",
+      "item": "L15. More than MAX_LINKS links: excess unread, one summary note; Export log shows link count and bytes",
+      "status": "pass",
+      "notes": "MAX_LINKS env-configurable"
+    }
+  ],
+  "standards_review": [
+    {
+      "kind": "commit-format",
+      "status": "partial",
+      "notes": "All 16 subjects carry EPMCDME-14735: prefix; 8 exceed the documented 72-char limit (73 to 101 chars)"
+    },
+    {
+      "kind": "code-quality",
+      "status": "na",
+      "notes": "No code-quality.md standard in the repo; development-practices.md spot-check conforms"
+    },
+    {
+      "kind": "security",
+      "status": "na",
+      "notes": "No security-patterns.md standard in the repo; independent check of export.py file reads found no concrete defect"
+    }
+  ],
+  "final_round": {
+    "decision": "request-changes",
+    "rationale": "All lenses and standards ran; 4 blocking: architecture.md lacks the required link semantics, L3 normalisation test omits outcome assertions, apply-level dup link untested, commit subjects exceed 72 chars. 1 deferred (explicit-path silent drops, see code-review-deferred.local.md), 17 dismissed as noise.",
+    "confidence": "high",
+    "risk_flags": [
+      "security"
+    ]
+  }
+}

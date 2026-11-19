@@ -523,6 +523,73 @@ Additional servers from the archived repository for extended functionality.
 | **GitHub MCP Server** | v0.20.2 | Advanced GitHub integration built in Go, enterprise features |
 | **Fetch MCP** | Latest  | Enhanced HTTP requests and web data fetching |
 
+## Exporting Files from stdio Servers
+
+A stdio MCP server that writes files (shell, Filesystem) can hand them to the user as downloads. The model names the files, or the server returns them as `resource_link` items; MCP-Connect reads them after the call and appends (or, for links, substitutes) embedded `resource` items in the `tools/call` result.
+
+**Before you opt in:** deploy this service first (it accepts `conversation_id` on `/bridge`; an older one rejects the unknown field with 400), then the CodeMie backend change that publishes embedded resources as downloads and sends `conversation_id` (codemie !4252). Until then every call carries the file bytes and no Download chip appears. Plugin (enterprise) MCP tools get no chips until EPMCDME-16353.
+
+**Opt in per server** by setting `CODEMIE_EXPORT_FILES` to `true`, `1`, `yes` or `on` (any case, string or JSON boolean) in the server's `env`. Export is off by default and applies to stdio servers only; HTTP and SSE servers never get it. The key is removed before the server starts, so it never reaches the child process or the client cache key.
+
+```json
+{
+  "command": "uvx",
+  "args": ["cli-mcp-server"],
+  "env": {
+    "ALLOWED_DIR": "/home/codemie",
+    "UV_CONSTRAINT": "/etc/uv-constraints.txt",
+    "CODEMIE_EXPORT_FILES": "true"
+  }
+}
+```
+
+`UV_CONSTRAINT` is needed for `uvx` servers: the MCP SDK passes only a short list of environment variables to the child process, so the image-wide `UV_CONSTRAINT` is not inherited and `uvx` resolves `mcp` 2.x, which `cli-mcp-server` cannot start with.
+
+```json
+{
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/codemie"],
+  "env": {
+    "CODEMIE_EXPORT_FILES": "true"
+  }
+}
+```
+
+On an opted-in server, `tools/list` adds an optional `codemie_export_files` array parameter to every tool (never added to `required`). The model lists the paths the user should receive. `codemie_export_files` is stripped from every stdio `tools/call`, opted in or not, so the server never sees it. The parameter's description tells the model to write such files under `/home/codemie/codemie_export`. The assistant instructions may repeat it: "When you create files for the user, write them under /home/codemie/codemie_export and list the same paths in codemie_export_files."
+
+**Each conversation has its own export folder.** Only files under `/home/codemie/u-<16 hex>/c-<16 hex>/` can be exported or delivered by link: the first hex is the start of the SHA-256 of the request's `user_id`, the second of its `conversation_id` (or `workflow_execution_id` for a workflow run without a conversation). A request with neither, as from an older backend, uses `/home/codemie/u-<16 hex>/`. The backend sends the person who made the call as `user_id`, also in a global assistant or workflow (codemie !4252), so runners of one workflow get separate folders. On an opted-in `tools/call`, MCP-Connect maps the path `/home/codemie/codemie_export` in every string argument (and in `codemie_export_files`) to that folder and creates it before the tool runs, so the model writes there directly; the `tools/list` description stays the same for every user because the backend caches it. Only the whole path component is mapped (`/home/codemie/codemie_export_dir` stays as written), and it is mapped in every string, file contents written through the call included. It is a path rather than a placeholder because models turned a `{...}` placeholder into a real folder of their own (round-3 re-run). A path outside the folder is refused, and the note names the folder, so the model writes the file there again and exports it. A call without `user_id` exports nothing and gets one note; its links and `/home/codemie/codemie_export` are left untouched. The folder names are plain hashes, not secrets. They keep same-named files of different users and conversations apart, so a model that lists a file before its script writes it gets "file not found" rather than an earlier conversation's report. A file from an earlier turn of the same conversation can still be exported by naming it.
+
+**Opt-in is not an access control.** It only decides where the parameter appears. Export and links read only the caller's folder; a server that itself reaches `/home/codemie` can still read other users' folders, because every server runs as the same uid (EPMCDME-16903). Opt in only servers whose reach over `/home/codemie` you already accept. Links widen this: the same switch also resolves `resource_link` items the server returns, so a server can name files itself. Opt in only servers whose output you also trust to name files; a stdio proxy to a remote server does not meet this.
+
+**Isolation assumes only the backend can call `/bridge`.** The folder is chosen by the `user_id` in the request body. Authentication is off when `ACCESS_TOKEN` is unset (the chart default), and the token, when set, is shared by all server configs rather than tied to a user. Anyone else who can reach the Service can therefore name any user's id and read that user's exported files. Such a caller could already run commands as the service user, so this is a precondition rather than a new exposure: restrict the Service to the backend (NetworkPolicy) or set `ACCESS_TOKEN`.
+
+**One server process serves all users.** The client cache key has no user, so a cached stdio process handles calls from different users. Export does not depend on the process's state: the `/home/codemie/codemie_export` mapping and the checks are per call. `cli-mcp-server` runs every command in a fresh subprocess, so a `cd` does not carry into the next call (measured); a server that keeps a working folder between calls would carry it across users.
+
+**Sizing.** Export folders are not cleaned up. They live on the `/home/codemie` volume (an `emptyDir` without `sizeLimit` when the root filesystem is read-only) until the pod restarts, so size the pod's ephemeral storage for the reports users generate between restarts. A sweep is EPMCDME-16903.
+
+**Path rules**
+- Relative paths resolve against the call's first absolute `directory`, `cwd` or `working_directory` argument, otherwise against `/home/codemie` (the server's working directory), so a bare name the server wrote there is refused rather than matched to an older file in the user's folder. Absolute paths are accepted inside the user's export folder.
+- Only regular files are exported. Symlinks (in any path component), `..` segments, hidden path segments (such as `.ssh`), FIFOs, devices, directories, missing files and paths outside the user's export folder are refused.
+- An empty file is refused with the reason "file is empty" (the backend does not accept an empty embedded blob).
+- Every refused or over-limit file is listed with its reason in one appended text item. Nothing is dropped silently.
+- When the result has `isError=true`, nothing is exported and one text item, "export skipped: the call failed", is added.
+- Limits: see the `MCP_CONNECT_EXPORT_*` variables in Environment Configuration below. The in-flight budget is pod-wide only while the service runs one worker and one replica.
+
+**Links (`resource_link`)**
+- On an opted-in stdio server, each `file:///` `resource_link` in a successful `tools/call` result is read from disk and replaced in place by the embedded file. Servers already opted in gain this on deploy; no new switch.
+- The server must return the link after the file is complete. A file still being written is delivered as it is.
+- Links use the same per-user root, path rules and budgets as model-named paths. A refused or unreadable link (wrong scheme, query or fragment, encoded `/`, `.` or NUL, non-canonical path, over a limit, missing) becomes one text note, `<uri>: <reason>`, at the link's position.
+- At most `MCP_CONNECT_EXPORT_MAX_LINKS` links are read per call; the rest are left unread and one summary note replaces them.
+- A link to a file already delivered in the same call (same real path) is dropped silently. A different file with the same name is delivered too; the backend names the second one `name (2).ext`.
+- Links in `isError` results, and in results of servers that are not opted-in or not stdio, are left untouched.
+
+**Known behavior**
+- A file is exported only when it is named by the model or returned by the server as a link. Nothing is inferred from file state.
+- A file from an earlier turn can be exported by naming it in a later call, or delivered through `read_media_file`.
+- Exporting the same file in two calls produces two chips (`name (2).ext`); duplicates are removed only within one call.
+- The parameter appears only after the backend's toolkit cache expires, up to 600 s after opting in.
+- The name `codemie_export_files` is reserved: a server parameter with that name loses its value on every stdio server.
+
 ## Environment Configuration 🔧
 
 The container supports the following environment variables:
@@ -544,6 +611,12 @@ The container supports the following environment variables:
 | `MCP_CONNECT_CACHE_CLEANUP_INTERVAL` | 60000 | Cleanup scheduler interval for removing expired clients in milliseconds (1 minute) |
 | `MCP_CONNECT_HTTP_TIMEOUT` | 30000 | HTTP connection timeout for streamable-http/SSE transports in milliseconds (30 seconds) |
 | `MCP_CONNECT_SSE_READ_TIMEOUT` | 300000 | SSE read timeout for long-polling connections in milliseconds (5 minutes) |
+| **File Export (EPMCDME-14735)** |
+| `MCP_CONNECT_EXPORT_MAX_FILE_BYTES` | 52428800 | Maximum size of one exported file in bytes (50 MiB) |
+| `MCP_CONNECT_EXPORT_MAX_CALL_BYTES` | 52428800 | Maximum total size of files exported by one call in bytes (50 MiB) |
+| `MCP_CONNECT_EXPORT_MAX_FILES` | 20 | Maximum number of files exported by one call |
+| `MCP_CONNECT_EXPORT_MAX_LINKS` | 50 | Maximum number of `resource_link` items resolved per call; the rest are left unread and replaced by one note |
+| `MCP_CONNECT_EXPORT_MAX_INFLIGHT_BYTES` | 52428800 | Pod-wide budget of file bytes being sent at once (50 MiB). Base64 plus JSON costs about 5x the file size, so the default is about 250 MiB of memory on a 1Gi pod that also holds the warm stdio servers. Measured locally with 7 warm servers (about 550 MiB): one 50 MiB export adds about 210 MiB, and two concurrent exports under a 100 MiB budget peaked at about 910 MiB of 1 GiB. Raise it only after measuring with your own server mix |
 
 ### Volume Mounts
 

@@ -34,6 +34,7 @@ from mcp.client.streamable_http import streamablehttp_client
 
 from mcp_connect.client.streamable_http_sigv4 import streamablehttp_client_with_sigv4
 from mcp_connect.utils.signer import SigV4Manager
+from mcp_connect.utils.workspace import server_cwd
 
 
 @asynccontextmanager
@@ -56,6 +57,7 @@ async def get_transport_ctx(request: Any, headers: dict[str, str] | None = None)
             command=request.serverPath,
             args=request.args or [],
             env=request.env,
+            cwd=server_cwd(),
         )
 
         async with stdio_client(server_params) as client_tuple:

@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "generated": "2026-11-05T00:00:00Z",
+  "dimensions": {
+    "component_scope":      { "score": 3, "label": "M" },
+    "requirements_clarity": { "score": 2, "label": "S" },
+    "technical_risk":       { "score": 4, "label": "L" },
+    "file_change_estimate": { "score": 4, "label": "L" },
+    "dependencies":         { "score": 1, "label": "XS" },
+    "affected_layers":      { "score": 2, "label": "S" }
+  },
+  "total": 16,
+  "size": "M",
+  "band_range": "15-20",
+  "files_changed": 9,
+  "routing": "brainstorming",
+  "key_reasoning": [
+    { "dimension": "technical_risk", "reason": "New file:/// URI decoding and validation (encoded slash/dot/NUL, backslash, query, non-canonical segments) in export.py is a new injection surface; the existing _check_path covers explicit paths but not URI decoding, so it diverges. Shared in-flight byte budget, per-call/per-file/file-count limits and the never-lose-tool-result fallback add resource and data-loss sensitivity. Edge-case tables are exercised in test_export_collect/test_export_links." },
+    { "dimension": "file_change_estimate", "reason": "9 files per diffstat: one source module (export.py), three new test/fixture files (test_export_links.py, test_export_links_e2e.py, link_server.py), two modified tests, plus README, architecture guide and spec docs." }
+  ],
+  "red_flags_applied": [
+    "Technical Risk raised to L: URI-to-path decoding is a security-sensitive surface the existing _check_path does not cover",
+    "Technical Risk: acceptance edge/error cases enumerated (refusal reasons, limits, dedup) with parameterized-style tests added in the same change"
+  ],
+  "split_recommendation": null
+}

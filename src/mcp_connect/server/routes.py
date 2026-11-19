@@ -21,9 +21,10 @@ import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
+from ..client import export
 from ..client.instructions import attach_server_instructions
 from ..client.manager import get_or_create_client, invoke_with_timeout
 from ..client.single_usage import execute_single_usage_request
@@ -310,7 +311,7 @@ async def bridge_endpoint(
         le=300000,
     ),
     _verified: None = Depends(verify_token),
-) -> JSONResponse:
+) -> Response:
     """
     Bridge MCP protocol requests to MCP servers.
 
@@ -348,11 +349,24 @@ async def bridge_endpoint(
     # Compute effective timeout: query param overrides default (Story 3.6)
     timeout_ms = timeout if timeout is not None else DEFAULT_TIMEOUT_MS
 
+    # EPMCDME-14735: strip the export switch/parameter before the handlers see the request
+    request, export_ctx = export.prepare(request)
+
     # Delegate to specialized handler based on usage mode
     if request.single_usage:
         result = await _handle_single_usage_request(request, timeout_ms)
     else:
         result = await _handle_cached_client_request(request, timeout_ms)
+
+    # Add X-Request-ID header for request tracing (Story 4.3)
+    request_id = get_request_id()
+    headers = {}
+    if request_id:
+        headers["X-Request-ID"] = request_id
+
+    # Only opted-in stdio servers pass through the export module (EPMCDME-14735)
+    if export_ctx.active:
+        return await export.apply(export_ctx, result, headers)
 
     # Convert Pydantic models to JSON-serializable dictionaries
     # exclude_none=True removes null fields from response (matches TypeScript behavior)
@@ -360,11 +374,5 @@ async def bridge_endpoint(
         result_dict = result.model_dump(mode="json", exclude_none=True)
     else:
         result_dict = result
-
-    # Add X-Request-ID header for request tracing (Story 4.3)
-    request_id = get_request_id()
-    headers = {}
-    if request_id:
-        headers["X-Request-ID"] = request_id
 
     return JSONResponse(content=result_dict, status_code=200, headers=headers)

@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "task": "Capture files written by stdio MCP servers during tools/call into a per-user/per-conversation output directory, append them to the tool result as embedded MCP resources with size/count limits, skip list and per-server opt-in, and add optional conversation_id/request_uuid to BridgeRequestBody (plus a minimal backend follow-up to send them).",
+  "generated": "2026-11-03T00:00:00Z",
+  "dimensions": {
+    "component_scope":      { "score": 5, "label": "XL" },
+    "requirements_clarity": { "score": 4, "label": "L" },
+    "technical_risk":       { "score": 5, "label": "XL" },
+    "file_change_estimate": { "score": 4, "label": "L" },
+    "dependencies":         { "score": 2, "label": "S" },
+    "affected_layers":      { "score": 4, "label": "L" }
+  },
+  "total": 24,
+  "size": "L",
+  "size_legend": {
+    "XS": "6-9 — < half day — plan directly",
+    "S": "10-14 — 1 day — plan directly",
+    "M": "15-20 — 2-3 days — brainstorm first",
+    "L": "21-26 — 4-5 days — brainstorm first",
+    "XL": "27-31 — > 1 sprint — recommend splitting",
+    "XXL": "32-36 — > 1 sprint — must split"
+  },
+  "routing": "brainstorming",
+  "key_reasoning": [
+    { "dimension": "component_scope", "reason": "Touches request schema (BridgeRequestBody), route layer (bridge_endpoint and both handlers), tools/call result path (invoke_mcp_method), all three stdio spawn sites (ManagedClient, single_usage, transports), possibly the cache key, plus a new capture/output-dir abstraction and a small backend MCPExecutionContext/MCPToolInvocationRequest change. 4+ components with a new abstraction; base L, bumped for core shared client utilities." },
+    { "dimension": "requirements_clarity", "reason": "Goal and limits are defined, but key design decisions are open: directory-diff vs dedicated output dir, how the dir reaches the server (cwd vs env) under config-keyed cached clients, retention/cleanup, duplication with read_media_file, skip-list contents. Task text also misstates the early-send failure (422 vs actual 400). Rework risk if the cache/isolation decision changes." },
+    { "dimension": "technical_risk", "reason": "No precedent in src/ for reading files, building EmbeddedResource/BlobResourceContents, or setting child cwd. Closest pattern (EPMCDME-14847 user_context -> meta threading) covers per-request data flow but not the security aspects: cross-user isolation (AC #6) with cached processes shared across users, path/symlink handling when reading server-written files, base64 payload memory on a 1Gi pod with no response cap, 2Gi emptyDir storage. Base L, bumped for security requirement." },
+    { "dimension": "file_change_estimate", "reason": "~8-10 modified (models/request.py, server/routes.py, client/methods.py, manager.py, single_usage.py, managed.py, transports.py, cache.py, README/architecture guide, test fakes) plus 2-4 new (capture module, filesystem tests) across src/, tests/, docs, plus 1-2 backend files." },
+    { "dimension": "affected_layers", "reason": "API (schema/route), Service (client layer, result rewrite), Infrastructure (filesystem output dirs on read-only-root pod with emptyDir volumes, possibly deploy-templates), External (backend caller contract with deploy-order dependency)." }
+  ],
+  "red_flags_applied": [
+    "Component Scope bumped from L to XL: touches core shared client utilities (all stdio spawn sites, invoke_mcp_method, cache key)",
+    "Technical Risk bumped from L to XL: security requirement (per-user file isolation, AC #6) not covered by the closest existing pattern"
+  ],
+  "split_recommendation": null
+}

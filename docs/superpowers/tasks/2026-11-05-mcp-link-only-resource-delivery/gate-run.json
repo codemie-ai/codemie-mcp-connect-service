@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "branch": "EPMCDME-14735_capture-generated-files",
+  "head": "b98e80fc899c0952917564483c5bd7727825bc54",
+  "runner": "poetry",
+  "started_at": "2026-11-05T12:31:36Z",
+  "completed_at": "2026-11-05T12:33:40Z",
+  "status": "PASSED",
+  "drift_detected": false,
+  "gates": [
+    {
+      "id": "lock",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 706,
+      "command": "poetry check --lock",
+      "exit_code": 0,
+      "notes": "deprecation warnings only"
+    },
+    {
+      "id": "format",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 785,
+      "command": "poetry run ruff format --check",
+      "exit_code": 0,
+      "notes": "guide command mutates; ran --check variant (guide-sanctioned) to avoid mutating"
+    },
+    {
+      "id": "lint",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 776,
+      "command": "poetry run ruff check",
+      "exit_code": 0
+    },
+    {
+      "id": "typecheck",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 1185,
+      "command": "poetry run mypy src/",
+      "exit_code": 0
+    },
+    {
+      "id": "format-verify",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 1094,
+      "command": "poetry run black --check src/ tests/",
+      "exit_code": 0
+    },
+    {
+      "id": "unit",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 104831,
+      "command": "poetry run pytest tests/ --cov=src --cov-report=term-missing",
+      "exit_code": 0,
+      "notes": "543 passed"
+    },
+    {
+      "id": "secrets",
+      "source": "guide",
+      "status": "PASS",
+      "duration_ms": 11924,
+      "command": "make gitleaks",
+      "exit_code": 0,
+      "notes": "no leaks found"
+    }
+  ],
+  "failures": {}
+}

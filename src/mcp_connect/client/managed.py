@@ -32,6 +32,7 @@ from mcp.client.sse import sse_client
 from ..models.request import BridgeRequestBody
 from ..utils.logger import get_logger
 from ..utils.masking import mask_sensitive_headers
+from ..utils.workspace import server_cwd
 from .client_info import apply_user_agent_header, get_client_info
 from .instructions import SessionHandshake, initialize_session
 
@@ -242,6 +243,7 @@ class ManagedClient:
             command=request.serverPath,
             args=request.args or [],
             env=request.env,
+            cwd=server_cwd(),
         )
 
         logger.debug(f"Starting stdio client: {server_params.command}")

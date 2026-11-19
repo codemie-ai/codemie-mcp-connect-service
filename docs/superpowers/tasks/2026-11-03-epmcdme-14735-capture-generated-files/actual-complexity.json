@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "generated": "2026-11-04T00:00:00Z",
+  "dimensions": {
+    "component_scope":      { "score": 3, "label": "M" },
+    "requirements_clarity": { "score": 2, "label": "S" },
+    "technical_risk":       { "score": 5, "label": "XL" },
+    "file_change_estimate": { "score": 4, "label": "L" },
+    "dependencies":         { "score": 2, "label": "S" },
+    "affected_layers":      { "score": 3, "label": "M" }
+  },
+  "total": 19,
+  "size": "M",
+  "band_range": "15-20",
+  "files_changed": 7,
+  "routing": "brainstorming",
+  "key_reasoning": [
+    { "dimension": "technical_risk", "reason": "New client/export.py reads arbitrary file paths named by the model: path normalisation, symlink and hidden-path rejection, O_NOFOLLOW/O_NONBLOCK opens, regular-file checks, per-file/per-call/file-count limits, and a pod-wide in-flight byte budget (base64 memory cost) released on cancel/error/response send. No existing precedent in the service; security- and memory-sensitive on a production bridge. Defensive edge-case suites (collect, prepare, apply) added." },
+    { "dimension": "file_change_estimate", "reason": "7 files per diffstat (1044 insertions): 1 new module, 3 new test files, routes.py hook, README.md, architecture.md." }
+  ],
+  "red_flags_applied": [
+    "Technical Risk raised: security-sensitive file access with no matching existing pattern (path validation and injection surface)",
+    "Technical Risk: performance/memory-bound concern (in-flight byte budget, thread offload)"
+  ],
+  "split_recommendation": null
+}

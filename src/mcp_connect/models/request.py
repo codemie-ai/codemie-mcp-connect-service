@@ -44,10 +44,15 @@ class BridgeRequestBody(BaseModel):
     )
 
     # Context fields for logging/observability
-    user_id: str | None = Field(None, description="Optional user identifier for logging")
+    user_id: str | None = Field(
+        None, description="Person who made the call: logging, and the key of their export folder (EPMCDME-14735)"
+    )
     assistant_id: str | None = Field(None, description="Optional assistant identifier for logging")
     project_name: str | None = Field(None, description="Optional project name for context propagation")
     workflow_execution_id: str | None = Field(None, description="Workflow execution identifier for tracing")
+    conversation_id: str | None = Field(
+        None, description="Conversation of the call: scopes the export folder within the user's (EPMCDME-14735)"
+    )
 
     @field_validator("env", mode="before")
     @classmethod
