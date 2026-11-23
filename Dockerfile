@@ -77,14 +77,21 @@ USER root
 # older exact pin fails with "Packages were downgraded"
 # Security (EPMCDME-17025, EPMCDME-17026): pin zlib1g/libminizip1t64 >=1:1.3.dfsg+really1.3.1-1+deb13u1
 # to fix CVE-2026-76844, CVE-2026-85091
+# Security (EPMCDME-17776, EPMCDME-17777, EPMCDME-17778, EPMCDME-17779): pin libgssapi-krb5-2/libk5crypto3/
+# libkrb5-3/libkrb5support0 to 1.21.3-5+deb13u2 (14 krb5 CVEs); openssl pins bumped to 3.5.9-1~deb13u1
+# because the previous 3.5.7-1~deb13u3 pin is older than the current archive and fails with "Packages were downgraded"
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
-        libssl3t64=3.5.7-1~deb13u3 \
-        openssl=3.5.7-1~deb13u3 \
-        openssl-provider-legacy=3.5.7-1~deb13u3 \
+        libssl3t64=3.5.9-1~deb13u1 \
+        openssl=3.5.9-1~deb13u1 \
+        openssl-provider-legacy=3.5.9-1~deb13u1 \
         zlib1g=1:1.3.dfsg+really1.3.1-1+deb13u1 \
         libminizip1t64=1:1.3.dfsg+really1.3.1-1+deb13u1 \
+        libgssapi-krb5-2=1.21.3-5+deb13u2 \
+        libk5crypto3=1.21.3-5+deb13u2 \
+        libkrb5-3=1.21.3-5+deb13u2 \
+        libkrb5support0=1.21.3-5+deb13u2 \
         # Core utilities
         wget \
         curl \
@@ -146,7 +153,7 @@ RUN mkdir -p /tmp/be-fix && \
     rm -rf /tmp/be-fix
 
 # Install Maven
-ENV MAVEN_VERSION=3.10.1
+ENV MAVEN_VERSION=3.10.2
 ENV MAVEN_HOME=/opt/apache-maven-${MAVEN_VERSION}
 
 RUN curl -Lso "/tmp/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
